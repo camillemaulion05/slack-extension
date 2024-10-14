@@ -1,14 +1,18 @@
 from flask import Flask, redirect, request, session, url_for, render_template_string
 import requests
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# Replace these with your app's credentials
-SLACK_CLIENT_ID = 'your_client_id'
-SLACK_CLIENT_SECRET = 'your_client_secret'
-SLACK_REDIRECT_URI = 'http://localhost:5000/slack/callback'
+# Retrieve Slack credentials from environment variables
+SLACK_CLIENT_ID = os.getenv('SLACK_CLIENT_ID')
+SLACK_CLIENT_SECRET = os.getenv('SLACK_CLIENT_SECRET')
+SLACK_REDIRECT_URI = os.getenv('SLACK_REDIRECT_URI')
 
 HTML_TEMPLATE = """
 <!doctype html>

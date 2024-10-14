@@ -9,6 +9,10 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+
+
 # Retrieve Slack credentials from environment variables
 SLACK_CLIENT_ID = os.getenv('SLACK_CLIENT_ID')
 SLACK_CLIENT_SECRET = os.getenv('SLACK_CLIENT_SECRET')

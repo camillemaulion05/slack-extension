@@ -86,3 +86,7 @@ def send_message():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    return f"An error occurred: {str(e)}", 500

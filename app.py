@@ -15,7 +15,7 @@ def index():
 
 @app.route('/login')
 def login():
-    return redirect(f"https://slack.com/oauth/v2/authorize?client_id={SLACK_CLIENT_ID}&scope=incoming-webhooksss&redirect_uri={SLACK_REDIRECT_URI}")
+    return redirect(f"https://slack.com/oauth/v2/authorize?client_id={SLACK_CLIENT_ID}&scope=incoming-webhook&redirect_uri={SLACK_REDIRECT_URI}")
 
 @app.route('/callback')
 def callback():

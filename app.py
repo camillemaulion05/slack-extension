@@ -3,15 +3,11 @@ import requests
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables from .env file (for local development)
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
-
 
 # Retrieve Slack credentials from environment variables
 SLACK_CLIENT_ID = os.getenv('SLACK_CLIENT_ID')
@@ -76,7 +72,7 @@ def send_message():
     }
 
     payload = {
-        'channel': '#your-channel',  # Set your channel here
+        'channel': '#your-channel',  # Change this to your channel
         'text': message
     }
 
@@ -89,4 +85,4 @@ def send_message():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    app.run(port=5000)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

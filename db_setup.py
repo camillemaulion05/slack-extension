@@ -27,7 +27,8 @@ def setup_database():
         client_secret VARCHAR(255) NOT NULL,
         scope VARCHAR(255),
         token VARCHAR(255),
-        incoming_webhook_url VARCHAR(255)
+        incoming_webhook_url VARCHAR(255),
+        is_installed BOOLEAN DEFAULT FALSE
     )
     ''')
 

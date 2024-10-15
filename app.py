@@ -9,41 +9,67 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Check for required environment variables
+required_env_vars = ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DB', 'APP_URL', 'PORT']
+for var in required_env_vars:
+    if os.getenv(var) is None:
+        print(f"Error: Environment variable {var} is not set.")
+        exit(1)
+
 PORT = int(os.environ.get('PORT', 8000))
 APP_URL = os.getenv("APP_URL")
 
 class MyHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
-        if self.path == '/':
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            with open('templates/index.html', 'r') as file:
-                self.wfile.write(file.read().encode())
+        print(f"Requested path: {self.path}")
 
-        elif self.path.startswith('/services'):
+        if self.path.startswith('/assets'):
+            return http.server.SimpleHTTPRequestHandler.do_GET(self)
+
+        if self.path == '/':
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
             services_data = self.get_services()
             services_html = ""
-            for service in services_data:
-                services_html += f"<tr><td>{service[1]}</td><td><a href='/login/{service[0]}'>Install</a> - <a href='/extension_actions/{service[0]}'>View Actions</a></td></tr>"
-            with open('templates/services.html', 'r') as file:
-                template = file.read()
-                response_html = template.replace("{{ services }}", services_html)
-                self.wfile.write(response_html.encode())
+
+            if services_data:
+                for service in services_data:
+                    if service[2] == 1:
+                        services_html += f"<tr><td>{service[1]}</td><td>Extension is already installed. <a href='/extension_actions/{service[0]}'>View Actions</a></td></tr>"
+                    else:
+                        services_html += f"<tr><td>{service[1]}</td><td><a href='/login/{service[0]}'>Install</a></td></tr>"
+            else:
+                services_html = "<tr><td colspan='2'>No extensions found.</td></tr>"
+
+            try:
+                with open('templates/index.html', 'r') as file:
+                    template = file.read()
+                    response_html = template.replace("{{ services }}", services_html)
+                    self.wfile.write(response_html.encode())
+            except FileNotFoundError:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Error: Template file not found.")
+                return
 
         elif self.path.startswith('/extension_actions'):
             app_id = self.path.split('/')[-1]
+            print(f"Requested extension actions for app_id: {app_id}")  # Debug log
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
 
             actions_data = self.get_extension_actions(app_id)
+            print(f"Actions data: {actions_data}")  # Debug log
             actions_html = ""
-            for action in actions_data:
-                actions_html += f"<tr><td>{action[1]}</td><td>{action[2]}</td><td>{action[3]}</td><td>{action[4]}</td><td>{action[5]}</td></tr>"
+            
+            if actions_data:
+                for action in actions_data:
+                    actions_html += f"<tr><td>{action[1]}</td><td>{action[2]}</td><td>{action[3]}</td><td>{action[4]}</td><td>{action[5]}</td></tr>"
+            else:
+                actions_html = "<tr><td colspan='5'>No actions found for this extension.</td></tr>"
+            
             with open('templates/extension_actions.html', 'r') as file:
                 template = file.read()
                 response_html = template.replace("{{ app_id }}", app_id).replace("{{ actions }}", actions_html)
@@ -54,17 +80,29 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
-            with open('templates/create_action.html', 'r') as file:
-                template = file.read()
-                response_html = template.replace("{{ app_id }}", app_id)
-                self.wfile.write(response_html.encode())
+            try:
+                with open('templates/create_action.html', 'r') as file:
+                    template = file.read()
+                    response_html = template.replace("{{ app_id }}", app_id)
+                    self.wfile.write(response_html.encode())
+            except FileNotFoundError:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Error: Template file not found.")
+                return
 
         elif self.path.startswith('/create_extension'):
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
-            with open('templates/create_extension.html', 'r') as file:
-                self.wfile.write(file.read().encode())
+            try:
+                with open('templates/create_extension.html', 'r') as file:
+                    self.wfile.write(file.read().encode())
+            except FileNotFoundError:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Error: Template file not found.")
+                return
 
         elif self.path.startswith('/login'):
             app_id = self.path.split('/')[-1]
@@ -84,7 +122,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             self.submit_action(post_data)
             self.send_response(303)
-            self.send_header('Location', '/services')
+            self.send_header('Location', '/')
             self.end_headers()
 
         elif self.path == '/submit_extension':
@@ -92,16 +130,35 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             self.submit_extension(post_data)
             self.send_response(303)
-            self.send_header('Location', '/services')
+            self.send_header('Location', '/')
             self.end_headers()
+
+    def connect_db(self):
+        try:
+            return mysql.connector.connect(
+                host=os.getenv('MYSQL_HOST'),
+                user=os.getenv('MYSQL_USER'),
+                password=os.getenv('MYSQL_PASSWORD'),
+                database=os.getenv('MYSQL_DB')
+            )
+        except mysql.connector.Error as err:
+            print(f"Error: {err}")
+            return None
 
     def get_services(self):
         db = self.connect_db()
-        cursor = db.cursor()
-        cursor.execute('SELECT pk, extension_name FROM ct_extensions')
-        services = cursor.fetchall()
-        cursor.close()
-        db.close()
+        if not db:
+            return []
+        try:
+            cursor = db.cursor()
+            cursor.execute('SELECT pk, extension_name, is_installed FROM ct_extensions')
+            services = cursor.fetchall()
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+            return []
+        finally:
+            cursor.close()
+            db.close()
         return services
 
     def get_extension_actions(self, app_id):
@@ -123,13 +180,19 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         app_id = params.get('app_id')[0]
 
         db = self.connect_db()
-        cursor = db.cursor()
-        cursor.execute('''INSERT INTO extension_actions (app_id, action_name, table_source, event_type, message, response_field_mapped_to)
-                          VALUES (%s, %s, %s, %s, %s, %s)''',
-                       (app_id, action_name, table_source, event_type, message, response_field_mapped_to))  
-        db.commit()
-        cursor.close()
-        db.close()
+        if not db:
+            return
+        try:
+            cursor = db.cursor()
+            cursor.execute('''INSERT INTO extension_actions (app_id, action_name, table_source, event_type, message, response_field_mapped_to)
+                              VALUES (%s, %s, %s, %s, %s, %s)''',
+                           (app_id, action_name, table_source, event_type, message, response_field_mapped_to))  
+            db.commit()
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+        finally:
+            cursor.close()
+            db.close()
 
     def submit_extension(self, data):
         params = urllib.parse.parse_qs(data.decode())
@@ -143,24 +206,43 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         scope = params.get('scope', [None])[0]
 
         db = self.connect_db()
-        cursor = db.cursor()
-        cursor.execute('''INSERT INTO ct_extensions (extension_name, extension_icon, description,
-                          authorization_url, token_url, client_id, client_secret, scope)
-                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
-                       (extension_name, extension_icon, description, 
-                        authorization_url, token_url, client_id, client_secret, scope))  
-        db.commit()
-        cursor.close()
-        db.close()
+        if not db:
+            return
+        try:
+            cursor = db.cursor()
+            cursor.execute('''INSERT INTO ct_extensions (extension_name, extension_icon, description,
+                              authorization_url, token_url, client_id, client_secret, scope)
+                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+                           (extension_name, extension_icon, description, 
+                            authorization_url, token_url, client_id, client_secret, scope))  
+            db.commit()
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+        finally:
+            cursor.close()
+            db.close()
 
     def handle_login(self, app_id):
         db = self.connect_db()
-        cursor = db.cursor()
-        cursor.execute("SELECT client_id, authorization_url, scope FROM ct_extensions WHERE pk = %s", (app_id,))
-        service = cursor.fetchone()
-        cursor.close()
-        db.close()
-        
+        if not db:
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"Database connection failed.")
+            return
+        try:
+            cursor = db.cursor()
+            cursor.execute("SELECT client_id, authorization_url, scope FROM ct_extensions WHERE pk = %s", (app_id,))
+            service = cursor.fetchone()
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"Database error.")
+            return
+        finally:
+            cursor.close()
+            db.close()
+
         if service:
             client_id = service[0]
             authorization_url = service[1]
@@ -186,11 +268,24 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         db = self.connect_db()
-        cursor = db.cursor()
-        cursor.execute("SELECT client_id, client_secret, token_url, extension_name FROM ct_extensions WHERE pk = %s", (app_id,))
-        service = cursor.fetchone()
-        cursor.close()
-        db.close()
+        if not db:
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"Database connection failed.")
+            return
+        try:
+            cursor = db.cursor()
+            cursor.execute("SELECT client_id, client_secret, token_url, extension_name FROM ct_extensions WHERE pk = %s", (app_id,))
+            service = cursor.fetchone()
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"Database error.")
+            return
+        finally:
+            cursor.close()
+            db.close()
 
         if service:
             client_id = service[0]
@@ -201,18 +296,16 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             token_data = {
                 'client_id': client_id,
                 'client_secret': client_secret,
-                'code': authorization_code[0],  # Ensure this is the first item in the list
+                'code': authorization_code[0],
                 'redirect_uri': f"{APP_URL}/callback/{app_id}",
-                'grant_type': 'authorization_code'  # This can be necessary for some APIs
+                'grant_type': 'authorization_code'
             }
 
             print("Access Token Request:", token_data)
 
-            # Post request to Slack to exchange the authorization code for an access token
             response = requests.post(token_url, data=token_data)
             token_response = response.json()
 
-            # Print the entire token response for debugging
             print("Access Token Response:", token_response)
 
             if token_response.get("ok"):
@@ -224,25 +317,37 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
 
                 if access_token:
                     db = self.connect_db()
-                    cursor = db.cursor()
-                    if incoming_webhook_url:
-                        cursor.execute(
-                            "UPDATE ct_extensions SET token = %s, incoming_webhook_url = %s WHERE pk = %s",
-                            (access_token, incoming_webhook_url, app_id)
-                        )
-                    else:
-                        cursor.execute(
-                            "UPDATE ct_extensions SET token = %s WHERE pk = %s",
-                            (access_token, app_id)
-                        )
+                    if not db:
+                        self.send_response(500)
+                        self.end_headers()
+                        self.wfile.write(b"Database connection failed.")
+                        return
+                    try:
+                        cursor = db.cursor()
+                        if incoming_webhook_url:
+                            cursor.execute(
+                                "UPDATE ct_extensions SET token = %s, incoming_webhook_url = %s, is_installed = %s WHERE pk = %s",
+                                (access_token, incoming_webhook_url, 1, app_id)
+                            )
+                        else:
+                            cursor.execute(
+                                "UPDATE ct_extensions SET token = %s, is_installed = %s WHERE pk = %s",
+                                (access_token, 1, app_id)
+                            )
 
-                    db.commit()
-                    cursor.close()
-                    db.close()
+                        db.commit()
+                    except mysql.connector.Error as err:
+                        print(f"Database error: {err}")
+                        self.send_response(500)
+                        self.end_headers()
+                        self.wfile.write(b"Database error.")
+                        return
+                    finally:
+                        cursor.close()
+                        db.close()
 
-                    # Redirect to the Available Services page
                     self.send_response(302)
-                    self.send_header('Location', '/services')
+                    self.send_header('Location', '/')
                     self.end_headers()
                 else:
                     self.send_response(400)
@@ -255,14 +360,6 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
-
-    def connect_db(self):
-        return mysql.connector.connect(
-            host=os.getenv('MYSQL_HOST'),
-            user=os.getenv('MYSQL_USER'),
-            password=os.getenv('MYSQL_PASSWORD'),
-            database=os.getenv('MYSQL_DB')
-        )
 
 if __name__ == "__main__":
     with socketserver.TCPServer(("", PORT), MyHandler) as httpd:

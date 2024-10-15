@@ -37,7 +37,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_login(app_id)
 
         elif self.path.startswith('/callback'):
-            app_id = self.path.split('/')[-1]
+            app_id = self.path.split('/')[-1].split('?')[0]
             self.handle_callback(app_id)
 
         else:

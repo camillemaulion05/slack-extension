@@ -143,8 +143,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             token_data = {
                 'client_id': client_id,
                 'client_secret': client_secret,
-                'code': authorization_code[0],
-                'grant_type': 'authorization_code',
+                'code': authorization_code,
                 'redirect_uri': f"{APP_URL}/callback/{app_id}"
             }
 

@@ -53,7 +53,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Error: Template file not found.")
                 return
 
-        elif self.path.startswith('/extension_actions'):
+        elif self.path.startswith('/extension_actions/'):
             app_id = self.path.split('/')[-1]
             print(f"Requested extension actions for app_id: {app_id}")  # Debug log
             self.send_response(200)
@@ -75,7 +75,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 response_html = template.replace("{{ app_id }}", app_id).replace("{{ actions }}", actions_html)
                 self.wfile.write(response_html.encode())
 
-        elif self.path.startswith('/create_action'):
+        elif self.path.startswith('/create_action/'):
             app_id = self.path.split('/')[-1]
             self.send_response(200)
             self.send_header('Content-type', 'text/html')

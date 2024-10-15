@@ -54,12 +54,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
     def get_services(self):
-        db = mysql.connector.connect(
-            host=os.getenv('MYSQL_HOST'),
-            user=os.getenv('MYSQL_USER'),
-            password=os.getenv('MYSQL_PASSWORD'),
-            database=os.getenv('MYSQL_DB')
-        )
+        db = self.connect_db()
         cursor = db.cursor()
         cursor.execute('SELECT pk, extension_name FROM ct_extensions')
         services = cursor.fetchall()
@@ -69,7 +64,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
 
     def add_service(self, data):
         params = urllib.parse.parse_qs(data.decode())
-        print("Received parameters:", params)  # Debugging line
+        print("Received parameters:", params)
 
         extension_name = params.get('extension_name')
         if not extension_name:
@@ -83,19 +78,13 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         token_url = params.get('token_url', [None])[0]
         client_id = params.get('client_id', [None])[0]
         client_secret = params.get('client_secret', [None])[0]
-        scope = params.get('scope', [None])[0]  # Updated here
+        scope = params.get('scope', [None])[0]
 
-        # Check for required fields
         if not all([client_id, client_secret, authorization_url, token_url]):
             print("Some required fields are missing.")
             return
 
-        db = mysql.connector.connect(
-            host=os.getenv('MYSQL_HOST'),
-            user=os.getenv('MYSQL_USER'),
-            password=os.getenv('MYSQL_PASSWORD'),
-            database=os.getenv('MYSQL_DB')
-        )
+        db = self.connect_db()
         cursor = db.cursor()
         cursor.execute('''INSERT INTO ct_extensions (extension_name, extension_icon, description,
                        authorization_url, token_url, client_id, client_secret, scope)
@@ -107,12 +96,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         db.close()
 
     def handle_login(self, app_id):
-        db = mysql.connector.connect(
-            host=os.getenv('MYSQL_HOST'),
-            user=os.getenv('MYSQL_USER'),
-            password=os.getenv('MYSQL_PASSWORD'),
-            database=os.getenv('MYSQL_DB')
-        )
+        db = self.connect_db()
         cursor = db.cursor()
         cursor.execute("SELECT client_id, authorization_url, scope FROM ct_extensions WHERE pk = %s", (app_id,))
         service = cursor.fetchone()
@@ -122,7 +106,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         if service:
             client_id = service[0]
             authorization_url = service[1]
-            scope = service[2]  # Get the scope from the database
+            scope = service[2]
 
             auth_url = f"{authorization_url}?client_id={client_id}&scope={scope}&redirect_uri={APP_URL}/callback/{app_id}"
             self.send_response(302)
@@ -143,12 +127,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(b"Missing authorization code.")
             return
 
-        db = mysql.connector.connect(
-            host=os.getenv('MYSQL_HOST'),
-            user=os.getenv('MYSQL_USER'),
-            password=os.getenv('MYSQL_PASSWORD'),
-            database=os.getenv('MYSQL_DB')
-        )
+        db = self.connect_db()
         cursor = db.cursor()
         cursor.execute("SELECT client_id, client_secret, token_url, extension_name FROM ct_extensions WHERE pk = %s", (app_id,))
         service = cursor.fetchone()
@@ -169,27 +148,19 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 'redirect_uri': f"{APP_URL}/callback/{app_id}"
             }
 
-            # Make a POST request to exchange the authorization code for an access token
             response = requests.post(token_url, data=token_data)
             token_response = response.json()
 
             if response.status_code == 200:
                 access_token = token_response.get('access_token')
 
-                # Only Slack will save the incoming webhook URL
                 incoming_webhook_url = None
                 if extension_name == "Slack":
                     incoming_webhook_url = token_response.get('incoming_webhook', {}).get('url')
 
                 if access_token:
-                    db = mysql.connector.connect(
-                        host=os.getenv('MYSQL_HOST'),
-                        user=os.getenv('MYSQL_USER'),
-                        password=os.getenv('MYSQL_PASSWORD'),
-                        database=os.getenv('MYSQL_DB')
-                    )
+                    db = self.connect_db()
                     cursor = db.cursor()
-                    # Save token and incoming webhook URL only for Slack
                     if incoming_webhook_url:
                         cursor.execute(
                             "UPDATE ct_extensions SET token = %s, incoming_webhook_url = %s WHERE pk = %s",
@@ -221,7 +192,13 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-# Existing server code...
+    def connect_db(self):
+        return mysql.connector.connect(
+            host=os.getenv('MYSQL_HOST'),
+            user=os.getenv('MYSQL_USER'),
+            password=os.getenv('MYSQL_PASSWORD'),
+            database=os.getenv('MYSQL_DB')
+        )
 
 if __name__ == "__main__":
     with socketserver.TCPServer(("", PORT), MyHandler) as httpd:

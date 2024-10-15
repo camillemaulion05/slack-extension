@@ -148,6 +148,8 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 'grant_type': 'authorization_code'  # This can be necessary for some APIs
             }
 
+            print("Access Token Request:", token_data)
+
             # Post request to Slack to exchange the authorization code for an access token
             response = requests.post(token_url, data=token_data)
             token_response = response.json()

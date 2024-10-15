@@ -26,11 +26,45 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-type', 'text/html')
             self.end_headers()
             services_data = self.get_services()
-            response_html = "<h1>Available Services</h1><ul>"
+            services_html = ""
             for service in services_data:
-                response_html += f"<li>{service[1]} - <a href='/login/{service[0]}'>Install</a></li>"
-            response_html += "</ul>"
-            self.wfile.write(response_html.encode())
+                services_html += f"<tr><td>{service[1]}</td><td><a href='/login/{service[0]}'>Install</a> - <a href='/extension_actions/{service[0]}'>View Actions</a></td></tr>"
+            with open('templates/services.html', 'r') as file:
+                template = file.read()
+                response_html = template.replace("{{ services }}", services_html)
+                self.wfile.write(response_html.encode())
+
+        elif self.path.startswith('/extension_actions'):
+            app_id = self.path.split('/')[-1]
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+
+            actions_data = self.get_extension_actions(app_id)
+            actions_html = ""
+            for action in actions_data:
+                actions_html += f"<tr><td>{action[1]}</td><td>{action[2]}</td><td>{action[3]}</td><td>{action[4]}</td><td>{action[5]}</td></tr>"
+            with open('templates/extension_actions.html', 'r') as file:
+                template = file.read()
+                response_html = template.replace("{{ app_id }}", app_id).replace("{{ actions }}", actions_html)
+                self.wfile.write(response_html.encode())
+
+        elif self.path.startswith('/create_action'):
+            app_id = self.path.split('/')[-1]
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            with open('templates/create_action.html', 'r') as file:
+                template = file.read()
+                response_html = template.replace("{{ app_id }}", app_id)
+                self.wfile.write(response_html.encode())
+
+        elif self.path.startswith('/create_extension'):
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            with open('templates/create_extension.html', 'r') as file:
+                self.wfile.write(file.read().encode())
 
         elif self.path.startswith('/login'):
             app_id = self.path.split('/')[-1]
@@ -45,12 +79,20 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
-        if self.path == '/add_service':
+        if self.path == '/submit_action':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
-            self.add_service(post_data)
+            self.submit_action(post_data)
             self.send_response(303)
-            self.send_header('Location', '/')
+            self.send_header('Location', '/services')
+            self.end_headers()
+
+        elif self.path == '/submit_extension':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            self.submit_extension(post_data)
+            self.send_response(303)
+            self.send_header('Location', '/services')
             self.end_headers()
 
     def get_services(self):
@@ -62,35 +104,51 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         db.close()
         return services
 
-    def add_service(self, data):
+    def get_extension_actions(self, app_id):
+        db = self.connect_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM extension_actions WHERE app_id = %s", (app_id,))
+        actions = cursor.fetchall()
+        cursor.close()
+        db.close()
+        return actions
+
+    def submit_action(self, data):
         params = urllib.parse.parse_qs(data.decode())
-        print("Received parameters:", params)
+        action_name = params.get('action_name')[0]
+        table_source = params.get('table_source')[0]
+        event_type = params.get('event_type')[0]
+        message = params.get('message')[0]
+        response_field_mapped_to = params.get('response_field_mapped_to')[0]
+        app_id = params.get('app_id')[0]
 
-        extension_name = params.get('extension_name')
-        if not extension_name:
-            print("Extension name not provided.")
-            return
+        db = self.connect_db()
+        cursor = db.cursor()
+        cursor.execute('''INSERT INTO extension_actions (app_id, action_name, table_source, event_type, message, response_field_mapped_to)
+                          VALUES (%s, %s, %s, %s, %s, %s)''',
+                       (app_id, action_name, table_source, event_type, message, response_field_mapped_to))  
+        db.commit()
+        cursor.close()
+        db.close()
 
+    def submit_extension(self, data):
+        params = urllib.parse.parse_qs(data.decode())
+        extension_name = params.get('extension_name')[0]
         extension_icon = params.get('extension_icon', [None])[0]
-        extension_name = extension_name[0]
         description = params.get('description', [None])[0]
-        authorization_url = params.get('authorization_url', [None])[0]
-        token_url = params.get('token_url', [None])[0]
-        client_id = params.get('client_id', [None])[0]
-        client_secret = params.get('client_secret', [None])[0]
+        authorization_url = params.get('authorization_url')[0]
+        token_url = params.get('token_url')[0]
+        client_id = params.get('client_id')[0]
+        client_secret = params.get('client_secret')[0]
         scope = params.get('scope', [None])[0]
-
-        if not all([client_id, client_secret, authorization_url, token_url]):
-            print("Some required fields are missing.")
-            return
 
         db = self.connect_db()
         cursor = db.cursor()
         cursor.execute('''INSERT INTO ct_extensions (extension_name, extension_icon, description,
-                       authorization_url, token_url, client_id, client_secret, scope)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
-                      (extension_name, extension_icon, description, 
-                       authorization_url, token_url, client_id, client_secret, scope))  
+                          authorization_url, token_url, client_id, client_secret, scope)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+                       (extension_name, extension_icon, description, 
+                        authorization_url, token_url, client_id, client_secret, scope))  
         db.commit()
         cursor.close()
         db.close()
@@ -182,10 +240,10 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                     cursor.close()
                     db.close()
 
-                    self.send_response(200)
-                    self.send_header('Content-type', 'text/html')
+                    # Redirect to the Available Services page
+                    self.send_response(302)
+                    self.send_header('Location', '/services')
                     self.end_headers()
-                    self.wfile.write(f"<h1>Callback received and token processed for App ID: {app_id}</h1>".encode())
                 else:
                     self.send_response(400)
                     self.end_headers()

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extension Actions</title>
+</head>
+<body>
+    <h1>Extension Actions for App ID: {{ app_id }}</h1>
+    <table>
+        <tr>
+            <th>Action Name</th>
+            <th>Table Source</th>
+            <th>Event Type</th>
+            <th>Message</th>
+            <th>Response Field Mapped To</th>
+        </tr>
+        {{ actions }}
+    </table>
+    <a href="/create_action/{{ app_id }}">Create Action</a>
+    <br>
+    <a href="/services">Back to Extensions</a>
+</body>
+</html>

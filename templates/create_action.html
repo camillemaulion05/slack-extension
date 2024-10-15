@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Action</title>
+</head>
+<body>
+    <h1>Create Action for App ID: {{ app_id }}</h1>
+    <form action="/submit_action" method="POST">
+        <label for="action_name">Action Name:</label>
+        <input type="text" name="action_name" required><br>
+        <label for="table_source">Table Source:</label>
+        <input type="text" name="table_source" required><br>
+        <label for="event_type">Event Type:</label>
+        <input type="text" name="event_type" required><br>
+        <label for="message">Message:</label>
+        <textarea name="message" required></textarea><br>
+        <label for="response_field_mapped_to">Response Field Mapped To:</label>
+        <input type="text" name="response_field_mapped_to" required><br>
+        <input type="hidden" name="app_id" value="{{ app_id }}">
+        <input type="submit" value="Submit Action">
+    </form>
+    <a href="/extension_actions/{{ app_id }}">Back to Extension Actions</a>
+</body>
+</html>

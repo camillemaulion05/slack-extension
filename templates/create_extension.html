@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Extension</title>
+</head>
+<body>
+    <h1>Create New Extension</h1>
+    <form action="/submit_extension" method="POST">
+        <label for="extension_name">Extension Name:</label>
+        <input type="text" name="extension_name" required><br>
+        
+        <label for="extension_icon">Extension Icon:</label>
+        <input type="text" name="extension_icon"><br>
+        
+        <label for="description">Description:</label>
+        <textarea name="description"></textarea><br>
+        
+        <label for="authorization_url">Authorization URL:</label>
+        <input type="text" name="authorization_url" required><br>
+        
+        <label for="token_url">Token URL:</label>
+        <input type="text" name="token_url" required><br>
+        
+        <label for="client_id">Client ID:</label>
+        <input type="text" name="client_id" required><br>
+        
+        <label for="client_secret">Client Secret:</label>
+        <input type="text" name="client_secret" required><br>
+        
+        <label for="scope">Scope:</label>
+        <input type="text" name="scope"><br>
+        
+        <input type="submit" value="Submit Extension">
+    </form>
+    <a href="/services">Back to Services</a>
+</body>
+</html>

@@ -3,37 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Service Management</title>
+    <title>Home</title>
 </head>
 <body>
-    <h1>Add New Service</h1>
-    <form action="/add_service" method="POST">
-        <label for="extension_icon">Extension Icon:</label>
-        <input type="text" id="extension_icon" name="extension_icon"><br>
-
-        <label for="extension_name">Extension Name:</label>
-        <input type="text" id="extension_name" name="extension_name" required><br>
-
-        <label for="description">Extension Description:</label>
-        <textarea id="description" name="description"></textarea><br>
-
-        <label for="authorization_url">Authorization URL:</label>
-        <input type="text" id="authorization_url" name="authorization_url" required><br>
-
-        <label for="token_url">Token URL:</label>
-        <input type="text" id="token_url" name="token_url" required><br>
-
-        <label for="client_id">Client ID:</label>
-        <input type="text" id="client_id" name="client_id" required><br>
-
-        <label for="client_secret">Client Secret:</label>
-        <input type="text" id="client_secret" name="client_secret" required><br>
-
-        <label for="scope">Scope:</label>
-        <input type="text" id="scope" name="scope" required><br>
-
-
-        <input type="submit" value="Add Service">
-    </form>
+    <h1>Welcome to the Extension Management App</h1>
+    <a href="/services">View Available Extensions</a>
 </body>
 </html>

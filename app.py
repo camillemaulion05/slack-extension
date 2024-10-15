@@ -143,14 +143,19 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             token_data = {
                 'client_id': client_id,
                 'client_secret': client_secret,
-                'code': authorization_code,
-                'redirect_uri': f"{APP_URL}/callback/{app_id}"
+                'code': authorization_code[0],  # Ensure this is the first item in the list
+                'redirect_uri': f"{APP_URL}/callback/{app_id}",
+                'grant_type': 'authorization_code'  # This can be necessary for some APIs
             }
 
+            # Post request to Slack to exchange the authorization code for an access token
             response = requests.post(token_url, data=token_data)
             token_response = response.json()
 
-            if response.status_code == 200:
+            # Print the entire token response for debugging
+            print("Access Token Response:", token_response)
+
+            if token_response.get("ok"):
                 access_token = token_response.get('access_token')
 
                 incoming_webhook_url = None
@@ -186,7 +191,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self.send_response(400)
                 self.end_headers()
-                self.wfile.write(b"Error exchanging authorization code for access token.")
+                self.wfile.write(f"Error exchanging authorization code for access token: {token_response.get('error')}".encode())
         else:
             self.send_response(404)
             self.end_headers()

@@ -451,6 +451,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                     incoming_webhook_url = token_response.get('incoming_webhook', {}).get('url')
 
                 if access_token:
+                    db = self.connect_db()
                     if not db:
                         self.send_response(500)
                         self.end_headers()

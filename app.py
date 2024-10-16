@@ -125,7 +125,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Missing account_url.")
 
         elif self.path.startswith('/callback'):
-            extension_code = self.path.split('/')[-1]
+            extension_code = self.path.split('/')[-1].split('?')[0]
             extensions_data = self.get_extension_by_code(extension_code)
             if not extensions_data:
                 self.send_response(404)
@@ -133,7 +133,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Extension not found.")
                 return
             self.handle_callback(extension_code)
-            
+
         else:
             self.send_response(404)
             self.end_headers()

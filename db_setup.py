@@ -24,6 +24,7 @@ def setup_database():
                 acct_id INT AUTO_INCREMENT PRIMARY KEY,
                 acct_name VARCHAR(255) NOT NULL UNIQUE,
                 acct_friendly_name VARCHAR(65) NOT NULL UNIQUE,
+                acct_url VARCHAR(255) NOT NULL,
                 disabled BOOLEAN DEFAULT FALSE
             )
             ''')
@@ -72,8 +73,9 @@ def setup_database():
                 profile_id INT AUTO_INCREMENT PRIMARY KEY,
                 account_id INT NOT NULL,
                 profile_name VARCHAR(255) NULL,
-                app_key VARCHAR(255) NOT NULL,
-                app_secret VARCHAR(255) NOT NULL,
+                app_key VARCHAR(255) NULL,
+                app_secret VARCHAR(255) NULL,
+                extension_installation_pk INT NOT NULL,
                 FOREIGN KEY (account_id) REFERENCES ct_accounts(acct_id) ON DELETE CASCADE
             )
             ''')

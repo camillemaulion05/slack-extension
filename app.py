@@ -132,6 +132,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"Extension not found.")
                 return
+            print(f"Extension Code: {extension_code}")
             self.handle_callback(extension_code)
 
         else:

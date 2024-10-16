@@ -70,9 +70,11 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             acct_name, acct_url = accounts_data[0], accounts_data[1]
             installed_extensions_data = self.get_installed_extensions(acct_id)
             installed_extensions_html = "".join(
-                f"<tr><td>{installed_extension[0]}</td><td>{installed_extension[1]}</td><td>{installed_extension[2]}</td></tr>"
+                f"<tr><td>{installed_extension[0]}</td><td>{installed_extension[1]}</td><td>"
+                f"{('<a href=\"{installed_extension[4]}/actions/\">View Extension Actions</a>' if installed_extension[2] and installed_extension[3] else f'<a href=\"{installed_extension[4]}/ws_profile/\">Update WS Profile</a>')}</td></tr>"
                 for installed_extension in installed_extensions_data
             ) or "<tr><td colspan='4'>No extensions are installed yet.</td></tr>"
+
 
             available_extensions_data = self.get_available_extensions(acct_id)
             available_extensions_html = "".join(
@@ -185,10 +187,11 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
 
     def get_installed_extensions(self, account_id):
         return self.execute_db_query("""
-            SELECT e.extension_name, e.description, e.extension_code
+            SELECT e.extension_name, e.description, wsp.app_key, wsp.app_secret, ei.pk
             FROM ct_extension_installations ei
             JOIN ct_extensions e ON ei.extension_pk = e.pk
             JOIN ct_accounts a ON ei.account_id = a.acct_id
+            JOIN ct_ws_profiles wsp ON ei.pk = wsp.extension_installation_pk
             WHERE ei.account_id = %s
         """, (account_id,))
 

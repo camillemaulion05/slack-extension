@@ -460,7 +460,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                     try:
                         cursor = db.cursor()
                         if incoming_webhook_url:
-                            cursor.execute('SELECT TOP 1 pk, account_id FROM ct_extension_installations ORDER BY pk DESC')
+                            cursor.execute('SELECT pk, account_id FROM ct_extension_installations ORDER BY pk DESC LIMIT 1')
                             extension_installation_data = cursor.fetchone()
                             if extension_installation_data:
                                 extension_installation_pk = extension_installation_data[0]

@@ -300,16 +300,19 @@ section[data-cb-name="cbTable"] {
   width: 100%;
 }
 
-.custom-card #caspioform {
-  padding: 1.25rem!important;
-}
-
-.cb-search-button-container {
-  margin-top: 31px;
-}
-
-#employee-table .cbSearchButtonContainer{
-  display: none !important;
+.cb-custom-card {
+  padding: 20px;
+  box-shadow: 0 0px 0px 0 rgba(0, 0, 0, 0.1), 0 1px 4px 0 rgba(0, 0, 0, 0.1);
+  position: relative;
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-direction: column;
+  flex-direction: column;
+  min-width: 0;
+  word-wrap: break-word;
+  background-color: #fff;
+  background-clip: border-box;
+  border-radius: .25rem;
 }
 
 .breadcrumb {

@@ -4,6 +4,7 @@ import socketserver
 import urllib.parse
 import mysql.connector
 import requests
+import random
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -23,36 +24,126 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         print(f"Requested path: {self.path}")
 
-        if self.path.startswith('/assets'):
-            return http.server.SimpleHTTPRequestHandler.do_GET(self)
-
         if self.path == '/':
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
-            services_data = self.get_services()
-            services_html = ""
+            with open('templates/index.html', 'r') as file:
+                self.wfile.write(file.read().encode())
 
-            if services_data:
-                for service in services_data:
-                    if service[2] == 1:
-                        services_html += f"<tr><td>{service[1]}</td><td>Extension is already installed. <a href='/extension_actions/{service[0]}'>View Actions</a></td></tr>"
-                    else:
-                        services_html += f"<tr><td>{service[1]}</td><td><a href='/login/{service[0]}'>Install</a></td></tr>"
+        elif self.path.startswith('/assets'):
+            return http.server.SimpleHTTPRequestHandler.do_GET(self)
+        
+        elif self.path.startswith('/extensions'):
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            extensions_data = self.get_extensions()
+            extensions_html = ""
+
+            if extensions_data:
+                for extension in extensions_data:
+                    extensions_html += f"<tr><td>{extension[0]}</td><td>{extension[1]}</td><td>{extension[2]}</td><td>{extension[3]}</td><td>{extension[4]}</td><td>{extension[5]}</td><td>{extension[6]}</td></tr>"
             else:
-                services_html = "<tr><td colspan='2'>No extensions found.</td></tr>"
+                extensions_html = "<tr><td colspan='12'>No extensions found.</td></tr>"
 
             try:
-                with open('templates/index.html', 'r') as file:
+                with open('templates/extensions.html', 'r') as file:
                     template = file.read()
-                    response_html = template.replace("{{ services }}", services_html)
+                    response_html = template.replace("{{ extensions }}", extensions_html)
                     self.wfile.write(response_html.encode())
             except FileNotFoundError:
                 self.send_response(500)
                 self.end_headers()
                 self.wfile.write(b"Error: Template file not found.")
                 return
+            
+        elif self.path.startswith('/extension-add'):
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            try:
+                with open('templates/extension-add.html', 'r') as file:
+                    self.wfile.write(file.read().encode())
+            except FileNotFoundError:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Error: Template file not found.")
 
+        elif self.path.startswith('/accounts/'):
+            # Extract account ID from the URL
+            acct_id = self.path.split('/')[-1]
+            accounts_data = self.get_account_by_id(acct_id)
+            if accounts_data:
+                acct_name = accounts_data[1]
+            else: 
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Account not found.")
+                return
+            
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+
+            # Fetch installed extensions for the account
+            extensions_data = self.get_installed_extensions(acct_id)
+            extensions_html = ""
+                
+            if extensions_data:
+                for extension in extensions_data:
+                    extensions_html += f"<tr><td>{extension[0]}</td><td>{extension[1]}</td><td>{extension[2]}</td><td>{extension[2]}</td></tr>"
+            else:
+                extensions_html = "<tr><td colspan='4'>No installed extensions found for this account.</td></tr>"
+
+            try:
+                with open('templates/account-extensions.html', 'r') as file:
+                    template = file.read()
+                    response_html = template.replace("{{ account_name }}", acct_name).replace("{{ extensions }}", extensions_html)
+                    self.wfile.write(response_html.encode())
+            except FileNotFoundError:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Error: Template file not found.")
+                    
+        elif self.path.startswith('/accounts'):
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            accounts_data = self.get_accounts()
+            accounts_html = ""
+
+            if accounts_data:
+                for account in accounts_data:
+                    acct_id, acct_name, acct_friendly_name, disabled = account
+                    status = "Active" if disabled == 0 else "Inactive"
+                    accounts_html += f"<tr><td>{acct_name}</td><td>{acct_friendly_name}</td><td>{status}</td><td><a href='/accounts/{acct_id}'>View Installed Extensions</a></td></tr>"
+            else:
+                accounts_html = "<tr><td colspan='12'>No accounts found.</td></tr>"
+
+            try:
+                with open('templates/accounts.html', 'r') as file:
+                    template = file.read()
+                    response_html = template.replace("{{ accounts }}", accounts_html)
+                    self.wfile.write(response_html.encode())
+            except FileNotFoundError:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Error: Template file not found.")
+                return
+            
+        elif self.path.startswith('/account-add'):
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            try:
+                with open('templates/account-add.html', 'r') as file:
+                    self.wfile.write(file.read().encode())
+            except FileNotFoundError:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Error: Template file not found.")
+        
         elif self.path.startswith('/extension_actions/'):
             app_id = self.path.split('/')[-1]
             print(f"Requested extension actions for app_id: {app_id}")  # Debug log
@@ -91,17 +182,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Error: Template file not found.")
                 return
 
-        elif self.path.startswith('/create_extension'):
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            try:
-                with open('templates/create_extension.html', 'r') as file:
-                    self.wfile.write(file.read().encode())
-            except FileNotFoundError:
-                self.send_response(500)
-                self.end_headers()
-                self.wfile.write(b"Error: Template file not found.")
+        
                 return
 
         elif self.path.startswith('/login'):
@@ -117,18 +198,26 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
-        if self.path == '/submit_action':
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            self.submit_action(post_data)
-            self.send_response(303)
-            self.send_header('Location', '/')
-            self.end_headers()
-
-        elif self.path == '/submit_extension':
+        if self.path == '/submit_extension':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             self.submit_extension(post_data)
+            self.send_response(303)
+            self.send_header('Location', '/extensions')
+            self.end_headers()
+
+        elif self.path == '/submit_account':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            self.submit_account(post_data)
+            self.send_response(303)
+            self.send_header('Location', '/accounts')
+            self.end_headers()
+
+        elif self.path == '/submit_action':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            self.submit_action(post_data)
             self.send_response(303)
             self.send_header('Location', '/')
             self.end_headers()
@@ -145,22 +234,127 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             print(f"Error: {err}")
             return None
 
-    def get_services(self):
+    def generate_random_code(self, length=6):
+        characters = 'abcdefghijklmnopqrstuvwxyz0123456789'  # lowercase letters and numbers
+        return ''.join(random.choice(characters) for _ in range(length))
+
+    def get_extensions(self):
         db = self.connect_db()
         if not db:
             return []
         try:
             cursor = db.cursor()
-            cursor.execute('SELECT pk, extension_name, is_installed FROM ct_extensions')
-            services = cursor.fetchall()
+            cursor.execute('SELECT pk, extension_code, extension_name, description, authorization_url, token_url, scope FROM ct_extensions')
+            extensions = cursor.fetchall()
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
             return []
         finally:
             cursor.close()
             db.close()
-        return services
+        return extensions
 
+    def submit_extension(self, data):
+        params = urllib.parse.parse_qs(data.decode())
+        extension_code = self.generate_random_code()
+        extension_name = params.get('extension_name')[0]
+        description = params.get('description', [None])[0]
+        authorization_url = params.get('authorization_url')[0]
+        token_url = params.get('token_url')[0]
+        client_id = params.get('client_id')[0]
+        client_secret = params.get('client_secret')[0]
+        scope = params.get('scope')[0]
+
+        db = self.connect_db()
+        if not db:
+            return
+        try:
+            cursor = db.cursor()
+            cursor.execute('''INSERT INTO ct_extensions (extension_code, extension_name, description,
+                              authorization_url, token_url, client_id, client_secret, scope)
+                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+                           (extension_code, extension_name, description, 
+                            authorization_url, token_url, client_id, client_secret, scope))  
+            db.commit()
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+        finally:
+            cursor.close()
+            db.close()
+
+    def get_accounts(self):
+        db = self.connect_db()
+        if not db:
+            return []
+        try:
+            cursor = db.cursor()
+            cursor.execute('SELECT acct_id, acct_name, acct_friendly_name, disabled FROM ct_accounts')
+            accounts = cursor.fetchall()
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+            return []
+        finally:
+            cursor.close()
+            db.close()
+        return accounts
+    
+    def get_account_by_id(self, acct_id):
+        db = self.connect_db()
+        if not db:
+            return None
+        try:
+            cursor = db.cursor()
+            cursor.execute("SELECT acct_id, acct_name, acct_friendly_name, disabled FROM ct_accounts WHERE acct_id = %s", (acct_id,))
+            return cursor.fetchone()
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+            return None
+        finally:
+            cursor.close()
+            db.close()
+    
+    def get_installed_extensions(self, account_id):
+        db = self.connect_db()
+        if not db:
+            return []
+        try:
+            cursor = db.cursor()
+            cursor.execute("""
+                SELECT e.pk, e.extension_name, e.description
+                FROM ct_extensions e 
+                JOIN ct_extension_installations ei ON e.pk = ei.extension_pk 
+                JOIN ct_accounts a ON a.acct_id = ei.account_id 
+                WHERE ei.account_id = %s
+            """, (account_id,))
+            extensions = cursor.fetchall()
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+            return []
+        finally:
+            cursor.close()
+            db.close()
+        return extensions
+
+    def submit_account(self, data):
+        params = urllib.parse.parse_qs(data.decode())
+        acct_name = params.get('acct_name')[0]
+        acct_friendly_name = params.get('acct_friendly_name')[0]
+
+        db = self.connect_db()
+        if not db:
+            return
+        try:
+            cursor = db.cursor()
+            cursor.execute('''INSERT INTO ct_accounts (acct_name, acct_friendly_name)
+                              VALUES (%s, %s)''',
+                           (acct_name, acct_friendly_name))  
+            db.commit()
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+        finally:
+            cursor.close()
+            db.close()
+    
     def get_extension_actions(self, app_id):
         db = self.connect_db()
         cursor = db.cursor()
@@ -194,33 +388,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             cursor.close()
             db.close()
 
-    def submit_extension(self, data):
-        params = urllib.parse.parse_qs(data.decode())
-        extension_name = params.get('extension_name')[0]
-        extension_icon = params.get('extension_icon', [None])[0]
-        description = params.get('description', [None])[0]
-        authorization_url = params.get('authorization_url')[0]
-        token_url = params.get('token_url')[0]
-        client_id = params.get('client_id')[0]
-        client_secret = params.get('client_secret')[0]
-        scope = params.get('scope', [None])[0]
-
-        db = self.connect_db()
-        if not db:
-            return
-        try:
-            cursor = db.cursor()
-            cursor.execute('''INSERT INTO ct_extensions (extension_name, extension_icon, description,
-                              authorization_url, token_url, client_id, client_secret, scope)
-                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
-                           (extension_name, extension_icon, description, 
-                            authorization_url, token_url, client_id, client_secret, scope))  
-            db.commit()
-        except mysql.connector.Error as err:
-            print(f"Database error: {err}")
-        finally:
-            cursor.close()
-            db.close()
+    
 
     def handle_login(self, app_id):
         db = self.connect_db()

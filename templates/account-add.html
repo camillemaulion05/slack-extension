@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" type="image/x-icon" href="assets/img/index.ico" />
+    <link rel="stylesheet" href="assets/lib/bootstrap-5.1.3-dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/lib/font-awesome/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/common.css?v=01312023">
+    <script src="assets/lib/jquery/dist/jquery.min.js"></script>
+    <script src="assets/lib/bootstrap-5.1.3-dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/common.js"></script>
+    <title>Extension Management - Add Account</title>
+</head>
+<body>
+    <nav class="navbar navbar-expand-md navbar-light bg-light fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="/"><img src="assets/img/logo.svg" style="height:30px;" /></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+    
+            <div class="collapse navbar-collapse" id="navbar">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="nav-extension" role="button" data-bs-toggle="dropdown" aria-expanded="false"> 
+                            <i class="fas fa-plug"></i> Extensions 
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="nav-extension">
+                            <li><a class="dropdown-item" href="/extensions" id="extension-list">Manage Extensions</a></li>
+                            <li><a class="dropdown-item" href="/extension-add" id="extension-add">Add Extension</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="nav-account" role="button" data-bs-toggle="dropdown" aria-expanded="false"> 
+                            <i class="fas fa-address-card"></i> Accounts 
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="nav-account">
+                            <li><a class="dropdown-item" href="/accounts" id="account-list">Manage Accounts</a></li>
+                            <li><a class="dropdown-item" href="/account-add" id="account-add">Add Account</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <script>
+        $('#nav-account').addClass('active');
+    </script>
+
+    <main role="main" class="container">
+        <div class="row">
+            <div class="col-md-12 text-center">
+                <nav class="mt-3" aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item" aria-current="page">
+                            <a id="prj-link" href="/accounts">
+                                <i class="fas fa-address-card"></i>
+                                All Accounts
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"> Add Account</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="cb-custom-card">
+                    <div class="col-md-6 offset-md-3">
+                        <h3 class="mb-3 text-center">
+                            Add Account
+                        </h3>
+                        <form action="/submit_account" method="POST">
+                            <div class="form-group mt-1">
+                                <label for="acct_name">Account ID:</label>
+                                <input type="text" class="form-control" name="acct_name" id="acct_name" required>
+                            </div>
+
+                            <div class="form-group mt-1">
+                                <label for="acct_friendly_name">Account Name:</label>
+                                <input type="text" class="form-control" name="acct_friendly_name" id="acct_friendly_name" required>
+                            </div>
+                            <br>
+                            <button type="submit" class="btn btn-primary mb-3">Submit Account</button>
+                        </form>
+                    </div>
+                    
+                </div>
+                
+            </div>
+        </div>
+    </main>
+</body>
+</html>

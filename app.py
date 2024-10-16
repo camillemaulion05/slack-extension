@@ -71,7 +71,9 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             installed_extensions_data = self.get_installed_extensions(acct_id)
             installed_extensions_html = "".join(
                 f"<tr><td>{installed_extension[0]}</td><td>{installed_extension[1]}</td><td>"
-                f"{('<a href=\"{installed_extension[4]}/actions/\">View Extension Actions</a>' if installed_extension[2] and installed_extension[3] else f'<a href=\"{installed_extension[4]}/ws_profile/\">Update WS Profile</a>')}</td></tr>"
+                f"{(''
+                f'<a href=\"{installed_extension[4]}/actions/\">View Extension Actions</a>' if installed_extension[2] and installed_extension[3] else 
+                f'<a href=\"{installed_extension[4]}/ws_profile/\">Update WS Profile</a>')}</td></tr>"
                 for installed_extension in installed_extensions_data
             ) or "<tr><td colspan='4'>No extensions are installed yet.</td></tr>"
 

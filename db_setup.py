@@ -77,6 +77,7 @@ def setup_database():
                 app_secret VARCHAR(255) NULL,
                 extension_installation_pk INT NOT NULL,
                 FOREIGN KEY (account_id) REFERENCES ct_accounts(acct_id) ON DELETE CASCADE
+                FOREIGN KEY (extension_installation_pk) REFERENCES ct_extension_installations(pk) ON DELETE CASCADE
             )
             ''')
 

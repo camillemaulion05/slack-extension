@@ -67,7 +67,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Account not found.")
                 return
 
-            acct_name, acct_url = accounts_data[1], accounts_data[3]
+            acct_name, acct_url = accounts_data[0], accounts_data[1]
             installed_extensions_data = self.get_installed_extensions(acct_id)
             installed_extensions_html = "".join(
                 f"<tr><td>{installed_extension[0]}</td><td>{installed_extension[1]}</td><td>{installed_extension[2]}</td></tr>"
@@ -240,11 +240,11 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         return self.execute_db_query('SELECT acct_id, acct_name, acct_friendly_name, acct_url, disabled FROM ct_accounts')
 
     def get_account_by_id(self, account_id):
-        accounts_data = self.execute_db_query('SELECT * FROM ct_accounts WHERE acct_id = %s', (account_id,))
+        accounts_data = self.execute_db_query('SELECT acct_name, acct_url FROM ct_accounts WHERE acct_id = %s', (account_id,))
         return accounts_data[0] if accounts_data else None
 
     def get_account_by_url(self, account_url):
-        accounts_data = self.execute_db_query('SELECT * FROM ct_accounts WHERE acct_url = %s', (account_url,))
+        accounts_data = self.execute_db_query('SELECT acct_id FROM ct_accounts WHERE acct_url = %s', (account_url,))
         return accounts_data[0] if accounts_data else None
     
     def get_extension_by_code(self, extension_code):

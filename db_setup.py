@@ -51,6 +51,8 @@ def setup_database():
                 installation_id VARCHAR(6) NOT NULL,
                 extension_pk INT NOT NULL,
                 account_id INT NOT NULL,
+                incoming_webhook_url VARCHAR(255) NULL,
+                token VARCHAR(255) NULL,
                 FOREIGN KEY (extension_pk) REFERENCES ct_extensions(pk) ON DELETE CASCADE,  
                 FOREIGN KEY (account_id) REFERENCES ct_accounts(acct_id) ON DELETE CASCADE     
             )

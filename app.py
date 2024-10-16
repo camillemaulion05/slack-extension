@@ -404,7 +404,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         try:
             cursor = db.cursor()
             cursor.execute("SELECT client_id, client_secret, token_url, extension_name FROM ct_extensions WHERE extension_code = %s", (extension_code,))
-            service = cursor.fetchone()
+            extension = cursor.fetchone()
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
             self.send_response(500)
@@ -415,11 +415,11 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             cursor.close()
             db.close()
 
-        if service:
-            client_id = service[0]
-            client_secret = service[1]
-            token_url = service[2]
-            extension_name = service[3]
+        if extension:
+            client_id = extension[0]
+            client_secret = extension[1]
+            token_url = extension[2]
+            extension_name = extension[3]
 
             token_data = {
                 'client_id': client_id,
@@ -444,8 +444,39 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                     incoming_webhook_url = token_response.get('incoming_webhook', {}).get('url')
 
                 if access_token:
+                    if not db:
+                        self.send_response(500)
+                        self.end_headers()
+                        self.wfile.write(b"Database connection failed.")
+                        return
+                    try:
+                        cursor = db.cursor()
+                        if incoming_webhook_url:
+                            cursor.execute('SELECT TOP 1 pk, account_id FROM ct_extension_installations ORDER BY pk DESC')
+                            extension_installation_data = cursor.fetchone()
+                            if extension_installation_data:
+                                extension_installation_pk = extension_installation_data[0]
+                                account_id = extension_installation_data[1]
+
+                            cursor.execute(
+                                "UPDATE ct_extension_installations SET token = %s, incoming_webhook_url = %s WHERE pk = %s",
+                                (access_token, incoming_webhook_url, extension_installation_pk)
+                            )
+                            
+                        db.commit()
+                    except mysql.connector.Error as err:
+                        print(f"Database error: {err}")
+                        self.send_response(500)
+                        self.end_headers()
+                        self.wfile.write(b"Database error.")
+                        return
+                    finally:
+                        cursor.close()
+                        db.close()
+
+                    acct_ext_url = f"/accounts/{account_id}"
                     self.send_response(302)
-                    self.send_header('Location', '/extensions')
+                    self.send_header('Location', acct_ext_url)
                     self.end_headers()
                 else:
                     self.send_response(400)

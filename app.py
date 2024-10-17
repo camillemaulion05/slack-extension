@@ -479,7 +479,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         }
 
         response = requests.post(token_url, data=token_data)
-        print(f"Access token response: {response.json().get('error')}")
+        print(f"Access token response: {response}")
         # token_response = response.json()
         # if not token_response.get("ok"):
         #     self.send_response(400)

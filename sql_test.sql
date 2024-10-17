@@ -23,14 +23,14 @@ CREATE TABLE IF NOT EXISTS extension_db.ct_extensions (
                 token_url VARCHAR(255) NOT NULL,
                 client_id VARCHAR(255) NOT NULL,
                 client_secret VARCHAR(255) NOT NULL,
-                scope VARCHAR(255) NOT NULL
+                bot_scope VARCHAR(255) NOT NULL,
+                user_scope VARCHAR(255) NOT NULL
             );
 CREATE TABLE IF NOT EXISTS extension_db.ct_extension_installations (
                 pk INT AUTO_INCREMENT PRIMARY KEY,     
                 installation_id VARCHAR(6) NOT NULL,
                 extension_pk INT NOT NULL,
                 account_id INT NOT NULL,
-                incoming_webhook_url VARCHAR(255) NULL,
                 token VARCHAR(255) NULL,
                 FOREIGN KEY (extension_pk) REFERENCES ct_extensions(pk) ON DELETE CASCADE,  
                 FOREIGN KEY (account_id) REFERENCES ct_accounts(acct_id) ON DELETE CASCADE     

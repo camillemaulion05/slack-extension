@@ -480,6 +480,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
 
         response = requests.post(token_url, data=token_data)
         token_response = response.json()
+        print(f"Access token response: {token_response}")
         if not token_response.get("ok"):
             self.send_response(400)
             self.end_headers()

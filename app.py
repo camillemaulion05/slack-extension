@@ -49,7 +49,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path.startswith('/extensions'):
             extensions_data = self.get_extensions()
             extensions_html = "".join(
-                f"<tr><td>{extension[0]}</td><td>{extension[1]}</td><td>{extension[2]}</td><td>{extension[3]}</td><td>{extension[4]}</td></tr>"
+                f"<tr><td>{extension[2]}</td><td>{extension[3]}</td><td>{extension[4]}</td><td>{extension[5]}</td><td>{extension[8]}</td></tr>"
                 for extension in extensions_data
             ) or "<tr><td colspan='12'>No extensions found.</td></tr>"
             self.send_html_response('templates/extensions.html', {"{{ extensions }}": extensions_html})
@@ -60,18 +60,17 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path.startswith('/accounts/'):
             acct_id = self.path.split('/')[-1]
             accounts_data = self.get_account_by_id(acct_id)
-
             if not accounts_data:
                 self.send_response(404)
                 self.end_headers()
                 self.wfile.write(b"Account not found.")
                 return
 
-            acct_name, acct_url = accounts_data[0], accounts_data[1]
+            acct_name, acct_url = accounts_data[1], accounts_data[3]
             installed_extensions_data = self.get_installed_extensions(acct_id)
             installed_extensions_html = "".join(
                 f"<tr><td>{installed_extension[0]}</td><td>{installed_extension[1]}</td><td>"
-                f"{self.generate_extension_link(installed_extension)}</td></tr>"
+                f"{self.get_extension_link(installed_extension)}</td></tr>"
                 for installed_extension in installed_extensions_data
             ) or "<tr><td colspan='4'>No extensions are installed yet.</td></tr>"
 
@@ -103,14 +102,13 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             # Parse the query parameters
             query = urllib.parse.urlparse(self.path).query
             params = urllib.parse.parse_qs(query)
-            
-            # Check if 'account_url' is in the parameters
-            if 'account_url' in params:
-                self.handle_installation(params['account_url'][0])  # Pass the first account_url
-            else:
+            if not 'account_url' in params:
                 self.send_response(400)
                 self.end_headers()
                 self.wfile.write(b"Missing account_url.")
+                return
+
+            self.handle_installation(params['account_url'][0])  # Pass the first account_url
 
         elif self.path.startswith('/callback'):
             extension_code = self.path.split('/')[-1].split('?')[0]
@@ -120,23 +118,20 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"Extension not found.")
                 return
-            print(f"Extension Code: {extension_code}")
+            
             self.handle_callback(extension_code)
 
         elif '/actions' in self.path:
             installation_id = self.path.split('/')[1]  
             extension_installations_data = self.get_extension_installation_by_id(installation_id)
-            if extension_installations_data:
-                extension_installation_pk = extension_installations_data[0]
-                acct_id = extension_installations_data[1]
-            else: 
+            if not extension_installations_data:
                 self.send_response(404)
                 self.end_headers()
                 self.wfile.write(b"Extension Installation not found.")
                 return
-        
+            
+            extension_installation_pk, acct_id = extension_installations_data[0], extension_installations_data[1]
             accounts_data = self.get_account_by_id(acct_id)
-
             if not accounts_data:
                 self.send_response(404)
                 self.end_headers()
@@ -144,7 +139,6 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             acct_name, acct_url = accounts_data[0], accounts_data[1]
-            
             actions_data = self.get_actions(extension_installation_pk)
             actions_html = "".join(
                 f"<tr><td>{actions[0]}</td><td>{actions[1]}</td><td>{actions[2]}</td><td>{actions[3]}</td></tr>"
@@ -159,10 +153,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         elif '/action-add' in self.path:
             installation_id = self.path.split('/')[1]  
             extension_installations_data = self.get_extension_installation_by_id(installation_id)
-            if extension_installations_data:
-                extension_installation_pk = extension_installations_data[0]
-                acct_id = extension_installations_data[1]
-            else: 
+            if not extension_installations_data:
                 self.send_response(404)
                 self.end_headers()
                 self.wfile.write(b"Extension Installation not found.")
@@ -173,18 +164,17 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         elif '/ws-profile/' in self.path:
             installation_id = self.path.split('/')[1]  
             extension_installations_data = self.get_extension_installation_by_id(installation_id)
-            if extension_installations_data:
-                extension_installation_pk = extension_installations_data[0]
-                acct_id = extension_installations_data[1]
-                extension_code = extension_installations_data[2]
-            else: 
+            if not extension_installations_data:
                 self.send_response(404)
                 self.end_headers()
                 self.wfile.write(b"Extension Installation not found.")
                 return
             
+            extension_installation_pk = extension_installations_data[0]
+            acct_id = extension_installations_data[1]
+            extension_code = extension_installations_data[2]
+            
             accounts_data = self.get_account_by_id(acct_id)
-
             if not accounts_data:
                 self.send_response(404)
                 self.end_headers()
@@ -194,7 +184,6 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             acct_name, acct_url = accounts_data[0], accounts_data[1]
 
             ws_profile_data = self.get_ws_profile_by_id(extension_installation_pk)
-            print(f"WS Profile: {ws_profile_data}")
             if not ws_profile_data:
                 self.send_response(404)
                 self.end_headers()
@@ -236,11 +225,9 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/update_ws_profile':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
-            # Parse the POST data
+            
             parsed_data = urllib.parse.parse_qs(post_data.decode('utf-8'))
-
-            # Extract fields from parsed_data
-            acct_id = parsed_data.get('acct_id', [None])[0]  # Default to None if not found
+            acct_id = parsed_data.get('acct_id', [None])[0]
 
             self.update_ws_profile(post_data)
 
@@ -248,6 +235,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             location = '/accounts/'
             if acct_id:
                 location += f'{urllib.parse.quote(acct_id)}'
+            
             self.send_response(303)
             self.send_header('Location', location)
             self.end_headers()
@@ -295,7 +283,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         return ''.join(random.choice(characters) for _ in range(length))
 
     def get_extensions(self):
-        return self.execute_db_query('SELECT extension_name, description, authorization_url, token_url, scope FROM ct_extensions')
+        return self.execute_db_query('SELECT pk, extension_code, extension_name, description, authorization_url, token_url, client_id, client_secret, scope FROM ct_extensions')
 
     def get_installed_extensions(self, account_id):
         return self.execute_db_query("""
@@ -316,7 +304,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             )
         """, (account_id,))
     
-    def generate_extension_link(self, installed_extension):
+    def get_extension_link(self, installed_extension):
         installation_id = installed_extension[4]
         if installed_extension[2] and installed_extension[3]:
             return f'<a href="/{installation_id}/actions/">View Extension Actions</a>'
@@ -324,13 +312,17 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             return f'<a href="/{installation_id}/ws-profile/">Update WS Profile</a>'
 
     def get_extension_by_code(self, extension_code):
-        extensions_data = self.execute_db_query('SELECT pk, extension_name, description, extension_code FROM ct_extensions WHERE extension_code = %s', (extension_code,))
+        extensions_data = self.execute_db_query('SELECT pk, extension_code, extension_name, description, authorization_url, token_url, client_id, client_secret, scope FROM ct_extensions WHERE extension_code = %s', (extension_code,))
         return extensions_data[0] if extensions_data else None
 
     def get_extension_installation_by_id(self, installation_id):
-        extension_actions_data = self.execute_db_query('SELECT ei.pk, ei.account_id, e.extension_code FROM ct_extension_installations ei JOIN ct_extensions e ON ei.extension_pk = e.pk WHERE installation_id = %s', (installation_id,))
-        return extension_actions_data[0] if extension_actions_data else None
+        extension_installations_data = self.execute_db_query('SELECT ei.pk, ei.account_id, e.extension_code FROM ct_extension_installations ei JOIN ct_extensions e ON ei.extension_pk = e.pk WHERE installation_id = %s', (installation_id,))
+        return extension_installations_data[0] if extension_installations_data else None
 
+    def get_latest_extension_installation(self):
+        extension_installations_data = self.execute_db_query('SELECT pk, account_id FROM ct_extension_installations ORDER BY pk DESC LIMIT 1')
+        return extension_installations_data[0] if extension_installations_data else None  
+    
     def submit_extension(self, data):
         params = urllib.parse.parse_qs(data.decode())
         extension_code = self.generate_random_code()
@@ -351,6 +343,9 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             db.commit()
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"Database error occurred.")
         finally:
             cursor.close()
             db.close()
@@ -359,11 +354,11 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         return self.execute_db_query('SELECT acct_id, acct_name, acct_friendly_name, acct_url, disabled FROM ct_accounts')
 
     def get_account_by_id(self, account_id):
-        accounts_data = self.execute_db_query('SELECT acct_name, acct_url FROM ct_accounts WHERE acct_id = %s', (account_id,))
+        accounts_data = self.execute_db_query('SELECT acct_id, acct_name, acct_friendly_name, acct_url, disabled FROM ct_accounts WHERE acct_id = %s', (account_id,))
         return accounts_data[0] if accounts_data else None
 
     def get_account_by_url(self, account_url):
-        accounts_data = self.execute_db_query('SELECT acct_id FROM ct_accounts WHERE acct_url = %s', (account_url,))
+        accounts_data = self.execute_db_query('SELECT acct_id, acct_name, acct_friendly_name, acct_url, disabled FROM ct_accounts WHERE acct_url = %s', (account_url,))
         return accounts_data[0] if accounts_data else None
     
     def submit_account(self, data):
@@ -383,6 +378,9 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             db.commit()
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"Database error occurred.")
         finally:
             cursor.close()
             db.close()
@@ -392,36 +390,31 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         # Assuming the code is in the second to last part of the URL
         extension_code = self.path.split('/')[-2]  
         extensions_data = self.get_extension_by_code(extension_code)
-        if extensions_data:
-            extension_pk = extensions_data[0]
-        else: 
+        if not extensions_data:
             self.send_response(404)
             self.end_headers()
             self.wfile.write(b"Extension not found.")
             return
         
+        extension_pk, authorization_url, client_id, scope = extensions_data[0], extensions_data[4], extensions_data[6], extensions_data[8]
         accounts_data = self.get_account_by_url(account_url)
-        if accounts_data:
-            account_id = accounts_data[0]
-        else: 
+        if not accounts_data:
             self.send_response(404)
             self.end_headers()
             self.wfile.write(b"Account not found.")
             return
-
-
-        installation_id = self.generate_random_code()
-
-        # Insert into the ct_extension_installations table
+        
+        account_id = accounts_data[0]
         db = self.connect_db()
         if not db:
             self.send_response(500)
             self.end_headers()
             self.wfile.write(b"Database connection failed.")
             return
-
         try:
             cursor = db.cursor()
+
+            installation_id = self.generate_random_code()
             query = """
                 INSERT INTO ct_extension_installations (installation_id, extension_pk, account_id)
                 VALUES (%s, %s, %s)
@@ -430,8 +423,6 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
 
             # Get the ID of the inserted record
             extension_installation_pk = cursor.lastrowid
-
-            # Now insert into ct_extension_profiles
             profile_code = self.generate_random_code()
             profile_query = """
                 INSERT INTO ct_extension_profiles (profile_name, profile_code, extension_installation_pk)
@@ -439,48 +430,67 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             """
             cursor.execute(profile_query, ('Default', profile_code, extension_installation_pk))
 
-            # Insert into ct_ws_profiles as well
             ws_query = """
                 INSERT INTO ct_ws_profiles (account_id, profile_name, extension_installation_pk)
                 VALUES (%s, %s, %s)
             """
             cursor.execute(ws_query, (account_id, 'Extension_'+extension_code, extension_installation_pk))
 
-            cursor.execute("SELECT client_id, authorization_url, scope FROM ct_extensions WHERE extension_code = %s", (extension_code,))
-            extension = cursor.fetchone()
-
             db.commit()
         except mysql.connector.Error as err:
+            db.rollback()
             print(f"Database error: {err}")
             self.send_response(500)
             self.end_headers()
-            self.wfile.write(b"Database error.")
+            self.wfile.write(b"Database error occurred.")
         finally:
             cursor.close()
             db.close()
 
-        if extension:
-            client_id = extension[0]
-            authorization_url = extension[1]
-            scope = extension[2]
-
-            auth_url = f"{authorization_url}?client_id={client_id}&scope={scope}&redirect_uri={APP_URL}/callback/{extension_code}"
-            self.send_response(302)
-            self.send_header('Location', auth_url)
-            self.end_headers()
-        else:
-            self.send_response(404)
-            self.end_headers()
+        auth_url = f"{authorization_url}?client_id={client_id}&scope={scope}&redirect_uri={APP_URL}/callback/{extension_code}"
+        self.send_response(302)
+        self.send_header('Location', auth_url)
+        self.end_headers()
 
     def handle_callback(self, extension_code):
         query = urllib.parse.urlparse(self.path).query
         params = urllib.parse.parse_qs(query)
         authorization_code = params.get('code')
-
         if not authorization_code:
             self.send_response(400)
             self.end_headers()
             self.wfile.write(b"Missing authorization code.")
+            return
+
+        extensions_data = self.get_extension_by_code(extension_code)
+        if not extensions_data:
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(b"Extension not found.")
+            return
+ 
+        token_url, client_id, client_secret = extensions_data[5], extensions_data[6], extensions_data[7]
+        token_data = {
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'code': authorization_code[0],
+            'redirect_uri': f"{APP_URL}/callback/{extension_code}",
+            'grant_type': 'authorization_code'
+        }
+
+        response = requests.post(token_url, data=token_data)
+        token_response = response.json()
+        if not token_response.get("ok"):
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(f"Error exchanging authorization code for access token: {token_response.get('error')}".encode())
+            return
+
+        access_token = token_response.get('access_token')
+        if not access_token:
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(b"Access token not found in response.")
             return
 
         db = self.connect_db()
@@ -489,97 +499,39 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"Database connection failed.")
             return
-
         try:
             cursor = db.cursor()
-            cursor.execute("SELECT client_id, client_secret, token_url, extension_name FROM ct_extensions WHERE extension_code = %s", (extension_code,))
-            extension = cursor.fetchone()
+
+            extension_installation_data = self.get_latest_extension_installation()
+            if not extension_installation_data:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Extension not found.")
+                return
+            
+            extension_installation_pk, account_id = extension_installation_data[0], extension_installation_data[1]
+            cursor.execute(
+                "UPDATE ct_extension_installations SET token = %s WHERE pk = %s",
+                (access_token, extension_installation_pk)
+            )
+                
+            db.commit()
         except mysql.connector.Error as err:
+            db.rollback()
             print(f"Database error: {err}")
             self.send_response(500)
             self.end_headers()
-            self.wfile.write(b"Database error.")
+            self.wfile.write(b"Database error occurred.")
             return
         finally:
             cursor.close()
             db.close()
-
-        if extension:
-            client_id = extension[0]
-            client_secret = extension[1]
-            token_url = extension[2]
-            extension_name = extension[3]
-
-            token_data = {
-                'client_id': client_id,
-                'client_secret': client_secret,
-                'code': authorization_code[0],
-                'redirect_uri': f"{APP_URL}/callback/{extension_code}",
-                'grant_type': 'authorization_code'
-            }
-
-            print("Access Token Request:", token_data)
-
-            response = requests.post(token_url, data=token_data)
-            token_response = response.json()
-
-            print("Access Token Response:", token_response)
-
-            if token_response.get("ok"):
-                access_token = token_response.get('access_token')
-
-                incoming_webhook_url = None
-                if extension_name == "Slack":
-                    incoming_webhook_url = token_response.get('incoming_webhook', {}).get('url')
-
-                if access_token:
-                    db = self.connect_db()
-                    if not db:
-                        self.send_response(500)
-                        self.end_headers()
-                        self.wfile.write(b"Database connection failed.")
-                        return
-                    try:
-                        cursor = db.cursor()
-                        if incoming_webhook_url:
-                            cursor.execute('SELECT pk, account_id FROM ct_extension_installations ORDER BY pk DESC LIMIT 1')
-                            extension_installation_data = cursor.fetchone()
-                            if extension_installation_data:
-                                extension_installation_pk = extension_installation_data[0]
-                                account_id = extension_installation_data[1]
-
-                            cursor.execute(
-                                "UPDATE ct_extension_installations SET token = %s, incoming_webhook_url = %s WHERE pk = %s",
-                                (access_token, incoming_webhook_url, extension_installation_pk)
-                            )
-                            
-                        db.commit()
-                    except mysql.connector.Error as err:
-                        print(f"Database error: {err}")
-                        self.send_response(500)
-                        self.end_headers()
-                        self.wfile.write(b"Database error.")
-                        return
-                    finally:
-                        cursor.close()
-                        db.close()
-
-                    acct_ext_url = f"/accounts/{account_id}"
-                    self.send_response(302)
-                    self.send_header('Location', acct_ext_url)
-                    self.end_headers()
-                else:
-                    self.send_response(400)
-                    self.end_headers()
-                    self.wfile.write(b"Access token not found in response.")
-            else:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(f"Error exchanging authorization code for access token: {token_response.get('error')}".encode())
-        else:
-            self.send_response(404)
-            self.end_headers()
     
+        acct_ext_url = f"/accounts/{account_id}"
+        self.send_response(302)
+        self.send_header('Location', acct_ext_url)
+        self.end_headers()
+
     def get_actions(self, extension_installation_pk):
         return self.execute_db_query('SELECT ea.action_name, ea.table_source, ea.event_type, ea.action_code FROM ct_extension_actions ea JOIN ct_extension_installations ei ON ea.extension_installation_pk = ei.pk WHERE ea.extension_installation_pk = %s', (extension_installation_pk,))
     
@@ -602,25 +554,27 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             db.commit()
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"Database error occurred.")
         finally:
             cursor.close()
             db.close()
 
     def get_ws_profile_by_id(self, extension_installation_pk):
-        ws_profile_data = self.execute_db_query('SELECT wsp.profile_name, wsp.profile_id FROM ct_ws_profiles wsp JOIN ct_extension_installations ei ON wsp.extension_installation_pk = ei.pk WHERE wsp.extension_installation_pk = %s', (extension_installation_pk,))
+        ws_profile_data = self.execute_db_query('SELECT wsp.profile_id, wsp.account_id, wsp.profile_name, wsp.app_key, wsp.app_secret, wsp.token_url, wsp.extension_installation_pk FROM ct_ws_profiles wsp JOIN ct_extension_installations ei ON wsp.extension_installation_pk = ei.pk WHERE wsp.extension_installation_pk = %s', (extension_installation_pk,))
         return ws_profile_data[0] if ws_profile_data else None    
 
     def update_ws_profile(self, data):
         params = urllib.parse.parse_qs(data.decode())
         db = self.connect_db()
-        
         if not db:
             self.send_response(500)
             self.end_headers()
             self.wfile.write(b"Database connection failed.")
             return
-        
         try:
+            cursor = db.cursor()
             token_url = params.get('token_url', [None])[0]
             client_id = params.get('app_key', [None])[0]
             client_secret = params.get('app_secret', [None])[0]
@@ -636,16 +590,10 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"All parameters are required.")
                 return
 
-            cursor = db.cursor()
-
-            # Prepare the update query
             query = '''UPDATE ct_ws_profiles 
                     SET app_key = %s, app_secret = %s, token_url = %s 
                     WHERE profile_id = %s'''
-            
-            # Execute the update
             cursor.execute(query, (client_id, client_secret, token_url, profile_id))
-            db.commit()
 
             if cursor.rowcount == 0:
                 self.send_response(404)
@@ -701,17 +649,15 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                             VALUES (%s, %s, %s, %s)'''
             
             cursor.execute(insert_query, (webhook_code, name, secret, extension_installation_pk))
-            db.commit()
 
             webhook_id = cursor.lastrowid
-
             insert_url_query = '''INSERT INTO ct_webhook_urls (url, webhook_id)
                                 VALUES (%s, %s)'''
             
             cursor.execute(insert_url_query, (outgoing_url, webhook_id))
             db.commit()
-
         except mysql.connector.Error as err:
+            db.rollback()
             print(f"Database error: {err}")
             self.send_response(500)
             self.end_headers()
@@ -724,8 +670,6 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         finally:
             cursor.close()
             db.close()
-
-
         
 if __name__ == "__main__":
     with socketserver.TCPServer(("", PORT), MyHandler) as httpd:

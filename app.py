@@ -480,55 +480,56 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
 
         response = requests.post(token_url, data=token_data)
         print(f"Access token response: {response.json().get('error')}")
-        token_response = response.json()
-        if not token_response.get("ok"):
-            self.send_response(400)
-            self.end_headers()
-            self.wfile.write(f"Error exchanging authorization code for access token: {token_response.get('error')}".encode())
-            return
+        # token_response = response.json()
+        # if not token_response.get("ok"):
+        #     self.send_response(400)
+        #     self.end_headers()
+        #     self.wfile.write(f"Error exchanging authorization code for access token: {token_response.get('error')}".encode())
+        #     return
 
-        access_token = token_response.get('access_token')
-        if not access_token:
-            self.send_response(400)
-            self.end_headers()
-            self.wfile.write(b"Access token not found in response.")
-            return
+        # access_token = token_response.get('access_token')
+        # if not access_token:
+        #     self.send_response(400)
+        #     self.end_headers()
+        #     self.wfile.write(b"Access token not found in response.")
+        #     return
 
-        db = self.connect_db()
-        if not db:
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(b"Database connection failed.")
-            return
-        try:
-            cursor = db.cursor()
+        # db = self.connect_db()
+        # if not db:
+        #     self.send_response(500)
+        #     self.end_headers()
+        #     self.wfile.write(b"Database connection failed.")
+        #     return
+        # try:
+        #     cursor = db.cursor()
 
-            extension_installation_data = self.get_latest_extension_installation()
-            if not extension_installation_data:
-                self.send_response(404)
-                self.end_headers()
-                self.wfile.write(b"Extension not found.")
-                return
+        #     extension_installation_data = self.get_latest_extension_installation()
+        #     if not extension_installation_data:
+        #         self.send_response(404)
+        #         self.end_headers()
+        #         self.wfile.write(b"Extension not found.")
+        #         return
             
-            extension_installation_pk, account_id = extension_installation_data[0], extension_installation_data[1]
-            cursor.execute(
-                "UPDATE ct_extension_installations SET token = %s WHERE pk = %s",
-                (access_token, extension_installation_pk)
-            )
+        #     extension_installation_pk, account_id = extension_installation_data[0], extension_installation_data[1]
+        #     cursor.execute(
+        #         "UPDATE ct_extension_installations SET token = %s WHERE pk = %s",
+        #         (access_token, extension_installation_pk)
+        #     )
                 
-            db.commit()
-        except mysql.connector.Error as err:
-            db.rollback()
-            print(f"Database error: {err}")
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(b"Database error occurred.")
-            return
-        finally:
-            cursor.close()
-            db.close()
+        #     db.commit()
+        # except mysql.connector.Error as err:
+        #     db.rollback()
+        #     print(f"Database error: {err}")
+        #     self.send_response(500)
+        #     self.end_headers()
+        #     self.wfile.write(b"Database error occurred.")
+        #     return
+        # finally:
+        #     cursor.close()
+        #     db.close()
     
-        acct_ext_url = f"/accounts/{account_id}"
+        acct_ext_url = f"/accounts"
+        # acct_ext_url = f"/accounts/{account_id}"
         self.send_response(302)
         self.send_header('Location', acct_ext_url)
         self.end_headers()

@@ -138,7 +138,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Account not found.")
                 return
 
-            acct_name, acct_url = accounts_data[0], accounts_data[1]
+            acct_name, acct_url = accounts_data[1], accounts_data[3]
             actions_data = self.get_actions(extension_installation_pk)
             actions_html = "".join(
                 f"<tr><td>{actions[0]}</td><td>{actions[1]}</td><td>{actions[2]}</td><td>{actions[3]}</td></tr>"
@@ -181,7 +181,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Account not found.")
                 return
 
-            acct_name, acct_url = accounts_data[0], accounts_data[1]
+            acct_name, acct_url = accounts_data[1], accounts_data[3]
 
             ws_profile_data = self.get_ws_profile_by_id(extension_installation_pk)
             if not ws_profile_data:

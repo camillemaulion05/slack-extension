@@ -641,7 +641,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Failed to call specific API.")
                 return
 
-            # Save the API response to the ct_webhooks table
+            print(f"API request error: {api_response.json()}")
             webhook_response = api_response.json()
             webhook_code = webhook_response.get('ID')
             secret = webhook_response.get('Secret')

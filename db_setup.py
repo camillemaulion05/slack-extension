@@ -77,6 +77,7 @@ def setup_database():
                 profile_name VARCHAR(255) NULL,
                 app_key VARCHAR(255) NULL,
                 app_secret VARCHAR(255) NULL,
+                token_url VARCHAR(255) NULL,
                 extension_installation_pk INT NOT NULL,
                 FOREIGN KEY (account_id) REFERENCES ct_accounts(acct_id) ON DELETE CASCADE
                 FOREIGN KEY (extension_installation_pk) REFERENCES ct_extension_installations(pk) ON DELETE CASCADE
@@ -98,6 +99,28 @@ def setup_database():
                 webhook_event_id INT NULL,
                 FOREIGN KEY (extension_installation_pk) REFERENCES ct_extension_installations(pk) ON DELETE CASCADE,
                 FOREIGN KEY (profile_id) REFERENCES ct_extension_profiles(profile_id) ON DELETE CASCADE
+            )
+            ''')
+
+            # Create the ct_webhooks table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ct_webhooks (
+                id INT AUTO_INCREMENT PRIMARY KEY,  
+                webhook_code VARCHAR(255) NOT NULL,
+                webhook_name VARCHAR(255) NOT NULL,
+                secret VARCHAR(255) NOT NULL,
+                extension_installation_pk INT NOT NULL,
+                FOREIGN KEY (extension_installation_pk) REFERENCES ct_extension_installations(pk) ON DELETE CASCADE
+            )
+            ''')
+
+            # Create the ct_webhook_urls table
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ct_webhook_urls (
+                webhook_url_pk INT AUTO_INCREMENT PRIMARY KEY,  
+                url VARCHAR(255) NOT NULL,                      
+                webhook_id INT NOT NULL,                         
+                FOREIGN KEY (webhook_id) REFERENCES ct_webhooks(id) ON DELETE CASCADE 
             )
             ''')
 

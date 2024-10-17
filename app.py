@@ -156,9 +156,61 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 "{{ account_name }}": acct_name,
             })
 
-        elif self.path.startswith('/create_action/'):
-            app_id = self.path.split('/')[-1]
-            self.send_html_response('templates/create_action.html', {"{{ app_id }}": app_id})
+        elif '/action-add' in self.path:
+            installation_id = self.path.split('/')[1]  
+            extension_installations_data = self.get_extension_installation_by_id(installation_id)
+            if extension_installations_data:
+                extension_installation_pk = extension_installations_data[0]
+                acct_id = extension_installations_data[1]
+            else: 
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Extension Installation not found.")
+                return
+            
+            self.send_html_response('templates/action-add.html', {"{{ installation_id }}": installation_id})
+
+        elif '/ws-profile' in self.path:
+            installation_id = self.path.split('/')[1]  
+            extension_installations_data = self.get_extension_installation_by_id(installation_id)
+            if extension_installations_data:
+                extension_installation_pk = extension_installations_data[0]
+                acct_id = extension_installations_data[1]
+                extension_code = extension_installations_data[2]
+            else: 
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Extension Installation not found.")
+                return
+            
+            accounts_data = self.get_account_by_id(acct_id)
+
+            if not accounts_data:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Account not found.")
+                return
+
+            acct_name, acct_url = accounts_data[0], accounts_data[1]
+
+            ws_profile_data = self.get_ws_profile_by_id(extension_installation_pk)
+            print(f"WS Profile: {ws_profile_data}")
+            if not ws_profile_data:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Web Service Profile not found.")
+                return
+
+            profile_name, profile_id = ws_profile_data[0], ws_profile_data[1]
+
+            self.send_html_response('templates/ws-profile.html', {
+                "{{ acct_id }}": f"{acct_id}",
+                "{{ account_name }}": acct_name,
+                "{{ profile_name }}": profile_name,
+                "{{ profile_id }}": f"{profile_id}",
+                "{{ extension_code }}": extension_code,
+                "{{ extension_installation_pk }}": f"{extension_installation_pk}"
+            })
 
         else:
             self.send_response(404)
@@ -179,6 +231,25 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             self.submit_account(post_data)
             self.send_response(303)
             self.send_header('Location', '/accounts')
+            self.end_headers()
+
+        elif self.path == '/update_ws_profile':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            # Parse the POST data
+            parsed_data = urllib.parse.parse_qs(post_data.decode('utf-8'))
+
+            # Extract fields from parsed_data
+            acct_id = parsed_data.get('acct_id', [None])[0]  # Default to None if not found
+
+            self.update_ws_profile(post_data)
+
+            # Construct the Location header with acct_id if it exists
+            location = '/accounts/'
+            if acct_id:
+                location += f'{urllib.parse.quote(acct_id)}'
+            self.send_response(303)
+            self.send_header('Location', location)
             self.end_headers()
 
         elif self.path == '/submit_action':
@@ -250,14 +321,14 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         if installed_extension[2] and installed_extension[3]:
             return f'<a href="/{installation_id}/actions/">View Extension Actions</a>'
         else:
-            return f'<a href="/{installation_id}/ws_profile/">Update WS Profile</a>'
+            return f'<a href="/{installation_id}/ws-profile/">Update WS Profile</a>'
 
     def get_extension_by_code(self, extension_code):
         extensions_data = self.execute_db_query('SELECT pk, extension_name, description, extension_code FROM ct_extensions WHERE extension_code = %s', (extension_code,))
         return extensions_data[0] if extensions_data else None
 
     def get_extension_installation_by_id(self, installation_id):
-        extension_actions_data = self.execute_db_query('SELECT pk, account_id FROM ct_extension_installations WHERE installation_id = %s', (installation_id,))
+        extension_actions_data = self.execute_db_query('SELECT ei.pk, ei.account_id, e.extension_code FROM ct_extension_installations ei JOIN ct_extensions e ON ei.extension_pk = e.pk WHERE installation_id = %s', (installation_id,))
         return extension_actions_data[0] if extension_actions_data else None
 
     def submit_extension(self, data):
@@ -535,6 +606,149 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             cursor.close()
             db.close()
 
+    def get_ws_profile_by_id(self, extension_installation_pk):
+        ws_profile_data = self.execute_db_query('SELECT wsp.profile_name, wsp.profile_id FROM ct_ws_profiles wsp JOIN ct_extension_installations ei ON wsp.extension_installation_pk = ei.pk WHERE wsp.extension_installation_pk = %s', (extension_installation_pk,))
+        return ws_profile_data[0] if ws_profile_data else None    
+
+    def update_ws_profile(self, data):
+        params = urllib.parse.parse_qs(data.decode())
+        db = self.connect_db()
+        
+        if not db:
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"Database connection failed.")
+            return
+        
+        try:
+            token_url = params.get('token_url', [None])[0]
+            client_id = params.get('app_key', [None])[0]
+            client_secret = params.get('app_secret', [None])[0]
+            profile_id = params.get('profile_id', [None])[0]
+            
+            cursor = db.cursor()
+            # Prepare the update query to include token_url
+            query = '''UPDATE ct_ws_profiles 
+                    SET app_key = %s, app_secret = %s, token_url = %s 
+                    WHERE profile_id = %s'''
+            
+            # Execute the update
+            cursor.execute(query, (
+                client_id, 
+                client_secret, 
+                token_url, 
+                profile_id
+            ))
+
+            db.commit()
+            
+            if cursor.rowcount == 0:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Profile ID not found.")
+                return
+
+
+
+            if not token_url:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"Token URL is required.")
+                return
+
+            # Get the base URL from the token URL
+            base_url = f"{urllib.parse.urlparse(token_url).scheme}://{urllib.parse.urlparse(token_url).netloc}/"
+
+            # Get authentication token
+            auth_response = requests.post(token_url, data={
+                'grant_type': 'client_credentials', 
+                'client_id': client_id,
+                'client_secret': client_secret
+            })
+
+            if auth_response.status_code != 200:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Failed to authenticate.")
+                return
+
+            token = auth_response.json().get('access_token')
+            print(f"token: {token}")
+
+            ## Prepare data for the specific API call
+            name = params.get('profile_name', [None])[0]  # Get name from the request
+            extension_code = params.get('extension_code', [None])[0]  # Get extension_code from the request
+            outgoing_url = f"{APP_URL}/{extension_code}/handleAsync"
+            specific_api_url = f"{base_url}rest/v2/outgoingWebhooks"
+            print(f"outgoing_url: {outgoing_url}")
+            print(f"specific_api_url: {specific_api_url}")
+
+            webhook_data = {
+                "Name": name,
+                "OutgoingUrls": [
+                    outgoing_url
+                ]
+            }
+            # Call the specific POST API with the token
+            api_response = requests.post(specific_api_url, json=webhook_data, headers={
+                'Authorization': f'Bearer {token}'
+            })
+            print(f"api_response: {api_response}")
+            if api_response.status_code != 200:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Failed to call specific API.")
+                return
+
+            # Save the API response to the ct_webhooks table
+            webhook_response = api_response.json()
+            
+            # Extract the fields needed to save
+            webhook_code = webhook_response.get('ID')  # Adjust the key based on actual API response
+            secret = webhook_response.get('secret')  # Adjust based on actual response
+            extension_installation_pk = params.get('extension_installation_pk', [None])[0]  # Get this from request or previous query
+            
+            # Prepare insert query for ct_webhooks
+            insert_query = '''INSERT INTO ct_webhooks (webhook_code, webhook_name, secret, extension_installation_pk)
+                            VALUES (%s, %s, %s, %s)'''
+            
+            cursor.execute(insert_query, (
+                webhook_code, 
+                name,  # Use the name from the request
+                secret, 
+                extension_installation_pk
+            ))
+
+            db.commit()
+
+            # Now, insert into ct_webhook_urls using the outgoing_url
+            webhook_id = cursor.lastrowid  # Get the last inserted id from ct_webhooks
+
+            insert_url_query = '''INSERT INTO ct_webhook_urls (url, webhook_id)
+                                VALUES (%s, %s)'''
+            
+            cursor.execute(insert_url_query, (
+                outgoing_url,
+                webhook_id
+            ))
+
+            db.commit()
+
+        except mysql.connector.Error as err:
+            print(f"Database error: {err}")
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"Database error occurred.")
+        except requests.RequestException as err:
+            print(f"API request error: {err}")
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"API request error occurred.")
+        finally:
+            cursor.close()
+            db.close()
+
+        
 if __name__ == "__main__":
     with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
         print(f"Serving on port {PORT}")

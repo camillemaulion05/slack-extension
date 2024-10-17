@@ -170,7 +170,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             
             self.send_html_response('templates/action-add.html', {"{{ installation_id }}": installation_id})
 
-        elif '/ws-profile' in self.path:
+        elif '/ws-profile/' in self.path:
             installation_id = self.path.split('/')[1]  
             extension_installations_data = self.get_extension_installation_by_id(installation_id)
             if extension_installations_data:

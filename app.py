@@ -705,7 +705,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             
             # Extract the fields needed to save
             webhook_code = webhook_response.get('ID')  # Adjust the key based on actual API response
-            secret = webhook_response.get('secret')  # Adjust based on actual response
+            secret = webhook_response.get('Secret')  # Adjust based on actual response
             extension_installation_pk = params.get('extension_installation_pk', [None])[0]  # Get this from request or previous query
             
             # Prepare insert query for ct_webhooks

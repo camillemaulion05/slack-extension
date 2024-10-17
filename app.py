@@ -194,10 +194,10 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
 
             self.send_html_response('templates/ws-profile.html', {
                 "{{ acct_id }}": f"{acct_id}",
-                "{{ account_name }}": acct_name,
-                "{{ profile_name }}": profile_name,
+                "{{ account_name }}": f"{acct_name}",
+                "{{ profile_name }}": f"{profile_name}",
                 "{{ profile_id }}": f"{profile_id}",
-                "{{ extension_code }}": extension_code,
+                "{{ extension_code }}": f"{extension_code}",
                 "{{ extension_installation_pk }}": f"{extension_installation_pk}"
             })
 

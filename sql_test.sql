@@ -23,8 +23,7 @@ CREATE TABLE IF NOT EXISTS extension_db.ct_extensions (
                 token_url VARCHAR(255) NOT NULL,
                 client_id VARCHAR(255) NOT NULL,
                 client_secret VARCHAR(255) NOT NULL,
-                bot_scope VARCHAR(255) NOT NULL,
-                user_scope VARCHAR(255) NOT NULL
+                scope VARCHAR(255) NOT NULL
             );
 CREATE TABLE IF NOT EXISTS extension_db.ct_extension_installations (
                 pk INT AUTO_INCREMENT PRIMARY KEY,     

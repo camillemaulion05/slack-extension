@@ -694,7 +694,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 'Authorization': f'Bearer {token}'
             })
             print(f"api_response: {api_response}")
-            if api_response.status_code != 200:
+            if api_response.status_code != 201:
                 self.send_response(500)
                 self.end_headers()
                 self.wfile.write(b"Failed to call specific API.")

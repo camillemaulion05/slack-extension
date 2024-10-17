@@ -190,7 +190,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Web Service Profile not found.")
                 return
 
-            profile_name, profile_id = ws_profile_data[0], ws_profile_data[1]
+            profile_id, profile_name = ws_profile_data[0], ws_profile_data[1]
 
             self.send_html_response('templates/ws-profile.html', {
                 "{{ acct_id }}": f"{acct_id}",

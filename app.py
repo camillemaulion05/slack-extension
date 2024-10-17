@@ -625,38 +625,34 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             client_id = params.get('app_key', [None])[0]
             client_secret = params.get('app_secret', [None])[0]
             profile_id = params.get('profile_id', [None])[0]
-            
+            name = params.get('profile_name', [None])[0]
+            extension_code = params.get('extension_code', [None])[0]
+            extension_installation_pk = params.get('extension_installation_pk', [None])[0]
+
+            # Validate required parameters
+            if not all([token_url, client_id, client_secret, profile_id, name, extension_code]):
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"All parameters are required.")
+                return
+
             cursor = db.cursor()
-            # Prepare the update query to include token_url
+
+            # Prepare the update query
             query = '''UPDATE ct_ws_profiles 
                     SET app_key = %s, app_secret = %s, token_url = %s 
                     WHERE profile_id = %s'''
             
             # Execute the update
-            cursor.execute(query, (
-                client_id, 
-                client_secret, 
-                token_url, 
-                profile_id
-            ))
-
+            cursor.execute(query, (client_id, client_secret, token_url, profile_id))
             db.commit()
-            
+
             if cursor.rowcount == 0:
                 self.send_response(404)
                 self.end_headers()
                 self.wfile.write(b"Profile ID not found.")
                 return
 
-
-
-            if not token_url:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(b"Token URL is required.")
-                return
-
-            # Get the base URL from the token URL
             base_url = f"{urllib.parse.urlparse(token_url).scheme}://{urllib.parse.urlparse(token_url).netloc}/"
 
             # Get authentication token
@@ -673,27 +669,23 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             token = auth_response.json().get('access_token')
-            print(f"token: {token}")
+            if not token:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Access token not found in response.")
+                return
 
-            ## Prepare data for the specific API call
-            name = params.get('profile_name', [None])[0]  # Get name from the request
-            extension_code = params.get('extension_code', [None])[0]  # Get extension_code from the request
             outgoing_url = f"{APP_URL}/{extension_code}/handleAsync"
             specific_api_url = f"{base_url}rest/v2/outgoingWebhooks"
-            print(f"outgoing_url: {outgoing_url}")
-            print(f"specific_api_url: {specific_api_url}")
 
             webhook_data = {
                 "Name": name,
-                "OutgoingUrls": [
-                    outgoing_url
-                ]
+                "OutgoingUrls": [outgoing_url]
             }
+
             # Call the specific POST API with the token
-            api_response = requests.post(specific_api_url, json=webhook_data, headers={
-                'Authorization': f'Bearer {token}'
-            })
-            print(f"api_response: {api_response}")
+            api_response = requests.post(specific_api_url, json=webhook_data, headers={'Authorization': f'Bearer {token}'})
+            
             if api_response.status_code != 201:
                 self.send_response(500)
                 self.end_headers()
@@ -702,36 +694,21 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
 
             # Save the API response to the ct_webhooks table
             webhook_response = api_response.json()
-            
-            # Extract the fields needed to save
-            webhook_code = webhook_response.get('ID')  # Adjust the key based on actual API response
-            secret = webhook_response.get('Secret')  # Adjust based on actual response
-            extension_installation_pk = params.get('extension_installation_pk', [None])[0]  # Get this from request or previous query
-            
-            # Prepare insert query for ct_webhooks
+            webhook_code = webhook_response.get('ID')
+            secret = webhook_response.get('Secret')
+
             insert_query = '''INSERT INTO ct_webhooks (webhook_code, webhook_name, secret, extension_installation_pk)
                             VALUES (%s, %s, %s, %s)'''
             
-            cursor.execute(insert_query, (
-                webhook_code, 
-                name,  # Use the name from the request
-                secret, 
-                extension_installation_pk
-            ))
-
+            cursor.execute(insert_query, (webhook_code, name, secret, extension_installation_pk))
             db.commit()
 
-            # Now, insert into ct_webhook_urls using the outgoing_url
-            webhook_id = cursor.lastrowid  # Get the last inserted id from ct_webhooks
+            webhook_id = cursor.lastrowid
 
             insert_url_query = '''INSERT INTO ct_webhook_urls (url, webhook_id)
                                 VALUES (%s, %s)'''
             
-            cursor.execute(insert_url_query, (
-                outgoing_url,
-                webhook_id
-            ))
-
+            cursor.execute(insert_url_query, (outgoing_url, webhook_id))
             db.commit()
 
         except mysql.connector.Error as err:
@@ -747,6 +724,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         finally:
             cursor.close()
             db.close()
+
 
         
 if __name__ == "__main__":

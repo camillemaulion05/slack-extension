@@ -294,13 +294,12 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
 
             post_data = self.rfile.read(content_length)
 
-            installation_id = self.path.split('/')[1]
-            extension_installations_data = self.get_extension_installation_by_id(installation_id)
-            if not extension_installations_data:
+            extension_code = self.path.split('/')[-2]  
+            extensions_data = self.get_extension_by_code(extension_code)
+            if not extensions_data:
                 self.send_response(404)
-                self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": "Extension Installation not found."}).encode())
+                self.wfile.write(b"Extension not found.")
                 return
 
             # Print received data for debugging

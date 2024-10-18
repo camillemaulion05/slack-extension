@@ -54,15 +54,17 @@ CREATE TABLE IF NOT EXISTS extension_db.ct_ws_profiles (
             );
 CREATE TABLE IF NOT EXISTS extension_db.ct_extension_actions (
                 action_id INT AUTO_INCREMENT PRIMARY KEY,
-                action_name VARCHAR(255) NOT NULL,
-                action_code VARCHAR(6) NOT NULL UNIQUE,
                 extension_installation_pk INT NOT NULL,
                 profile_id INT NOT NULL,
-                table_source VARCHAR(255) NOT NULL,
+                webhook_event_id VARCHAR(6) NOT NULL,
+                action_name VARCHAR(255) NOT NULL,
+                action_code VARCHAR(6) NOT NULL,
+                event_object VARCHAR(255) NOT NULL,
                 event_type VARCHAR(255) NOT NULL,
-                message TEXT NOT NULL,
-                response_field_mapped_to VARCHAR(255),
-                webhook_event_id INT NULL,
+                event_input_field TEXT NOT NULL,
+                action_object VARCHAR(255) NOT NULL,
+                action_type VARCHAR(255) NOT NULL,
+                action_output_field TEXT NOT NULL,
                 FOREIGN KEY (extension_installation_pk) REFERENCES ct_extension_installations(pk) ON DELETE CASCADE,
                 FOREIGN KEY (profile_id) REFERENCES ct_extension_profiles(profile_id) ON DELETE CASCADE
             );

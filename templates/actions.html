@@ -61,10 +61,9 @@
                         </li>
                         <li class="breadcrumb-item" aria-current="page"> 
                             <a id="act-link" href="/accounts/{{ acct_id }}">
-                                Extensions for {{ account_name }}
+                                Extensions POC for {{ account_name }}
                             </a>
                         </li>
-                        
                         <li class="breadcrumb-item active" aria-current="page"> Actions</li>
                     </ol>
                 </nav>
@@ -73,12 +72,17 @@
         <div class="row">
             <div class="col-md-12">
                 <div class="cb-custom-card">
+                    <div class="text-end">
+                        <a href="/{{ installation_id }}/action-add" class="btn btn-primary">Create Extension Action</a>
+                    </div>
                     <table class="table table-striped">
                         <thead>
                             <tr>
                                 <th>Name</th>
                                 <th>Event object</th>
                                 <th>Event type</th>
+                                <th>Action object</th>
+                                <th>Action type</th>
                                 <th>Action ID</th>
                             </tr>
                         </thead>

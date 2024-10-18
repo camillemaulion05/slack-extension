@@ -3,6 +3,7 @@ import http.server
 import socketserver
 import urllib.parse
 import mysql.connector
+import json
 import requests
 import random
 from dotenv import load_dotenv
@@ -141,13 +142,14 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             acct_name, acct_url = accounts_data[1], accounts_data[3]
             actions_data = self.get_actions(extension_installation_pk)
             actions_html = "".join(
-                f"<tr><td>{actions[0]}</td><td>{actions[1]}</td><td>{actions[2]}</td><td>{actions[3]}</td></tr>"
+                f"<tr><td>{actions[4]}</td><td>{actions[6]}</td><td>{actions[7]}</td><td>{actions[9]}</td><td>{actions[10]}</td><td>{actions[5]}</td></tr>"
                 for actions in actions_data
             ) or "<tr><td colspan='12'>No extension actions found.</td></tr>"
             self.send_html_response('templates/actions.html', {
                 "{{ actions }}": actions_html,
                 "{{ acct_id }}": f"{acct_id}",
                 "{{ account_name }}": acct_name,
+                "{{ installation_id }}": f"{installation_id}"
             })
 
         elif '/action-add' in self.path:
@@ -159,7 +161,30 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Extension Installation not found.")
                 return
             
-            self.send_html_response('templates/action-add.html', {"{{ installation_id }}": installation_id})
+            extension_installation_pk, acct_id = extension_installations_data[0], extension_installations_data[1]
+            accounts_data = self.get_account_by_id(acct_id)
+            if not accounts_data:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Account not found.")
+                return
+
+            acct_name, acct_url = accounts_data[1], accounts_data[3]
+            ws_profile_data = self.get_ws_profile_by_id(extension_installation_pk)
+            if not ws_profile_data:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Web Service Profile not found.")
+                return
+
+            profile_id = ws_profile_data[0]
+            self.send_html_response('templates/action-add.html', {
+                "{{ acct_id }}": f"{acct_id}",
+                "{{ account_name }}": acct_name,
+                "{{ installation_id }}": f"{installation_id}",
+                "{{ extension_installation_pk }}": f"{extension_installation_pk}",
+                "{{ profile_id }}": f"{profile_id}"
+            })
 
         elif '/ws-profile/' in self.path:
             installation_id = self.path.split('/')[1]  
@@ -170,10 +195,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Extension Installation not found.")
                 return
             
-            extension_installation_pk = extension_installations_data[0]
-            acct_id = extension_installations_data[1]
-            extension_code = extension_installations_data[2]
-            
+            extension_installation_pk, acct_id, extension_code = extension_installations_data[0], extension_installations_data[1], extension_installations_data[2]
             accounts_data = self.get_account_by_id(acct_id)
             if not accounts_data:
                 self.send_response(404)
@@ -243,10 +265,77 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/submit_action':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
+
+            parsed_data = urllib.parse.parse_qs(post_data.decode('utf-8'))
+            installation_id = parsed_data.get('installation_id', [None])[0]
+
             self.submit_action(post_data)
+
+            # Construct the Location header with acct_id if it exists
+            location = '/'
+            if installation_id:
+                location += f'{urllib.parse.quote(installation_id)}' +'/actions'
+
             self.send_response(303)
-            self.send_header('Location', '/')
+            self.send_header('Location', location)
             self.end_headers()
+
+        elif '/handleAsync' in self.path:
+            content_length = int(self.headers['Content-Length'])
+            
+            # Check if content length is zero
+            if content_length == 0:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "No data provided."}).encode())
+                return
+
+            post_data = self.rfile.read(content_length)
+
+            installation_id = self.path.split('/')[1]
+            extension_installations_data = self.get_extension_installation_by_id(installation_id)
+            if not extension_installations_data:
+                self.send_response(404)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Extension Installation not found."}).encode())
+                return
+
+            # Print received data for debugging
+            print(f"Received post_data: {post_data.decode('utf-8')}")
+
+            # Try to load JSON
+            try:
+                payload = json.loads(post_data)
+            except json.JSONDecodeError:
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Invalid JSON format."}).encode())
+                return
+
+            channel = payload.get('channel')
+            message = payload.get('message')
+
+            # Replace with your actual Slack bot token
+            slack_token = 'xoxb-7845531601254-7894967964693-8c3fNv8shewzhublD0huAfod'
+
+            # Send message to Slack
+            slack_response = self.send_message_to_slack(channel, message, slack_token)
+
+            # Check response from Slack
+            if slack_response.get('ok'):
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"message": "Message sent to Slack."}).encode())
+            else:
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": f"Failed to send message to Slack: {slack_response.get('error')}"}).encode())
+
 
     def connect_db(self):
         try:
@@ -533,7 +622,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def get_actions(self, extension_installation_pk):
-        return self.execute_db_query('SELECT ea.action_name, ea.table_source, ea.event_type, ea.action_code FROM ct_extension_actions ea JOIN ct_extension_installations ei ON ea.extension_installation_pk = ei.pk WHERE ea.extension_installation_pk = %s', (extension_installation_pk,))
+        return self.execute_db_query('SELECT ea.action_id, ea.extension_installation_pk, ea.profile_id, ea.webhook_event_id, ea.action_name, ea.action_code, ea.event_object, ea.event_type, ea.event_input_field, ea.action_object, ea.action_type, ea.action_output_field FROM ct_extension_actions ea JOIN ct_extension_installations ei ON ea.extension_installation_pk = ei.pk WHERE ea.extension_installation_pk = %s', (extension_installation_pk,))
     
     def submit_action(self, data):
         params = urllib.parse.parse_qs(data.decode())
@@ -545,12 +634,83 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             return
         try:
             cursor = db.cursor()
-            cursor.execute('''INSERT INTO ct_extension_actions (extension_pk, action_name, action_url, 
-                              action_method, action_description, action_payload)
-                              VALUES (%s, %s, %s, %s, %s, %s)''',
-                           (params.get('extension_pk')[0], params.get('action_name')[0],
-                            params.get('action_url')[0], params.get('action_method')[0],
-                            params.get('action_description')[0], params.get('action_payload')[0]))
+            extension_installation_pk = params.get('extension_installation_pk')[0]
+            profile_id = params.get('profile_id')[0]
+            action_name = params.get('action_name')[0]
+            action_code = self.generate_random_code()
+            event_object = params.get('event_object')[0]
+            event_type = params.get('event_type')[0]
+            event_input_field = params.get('event_input_field')[0]
+            action_object = params.get('action_object')[0]
+            action_type = params.get('action_type')[0]
+            action_output_field = params.get('action_output_field')[0]
+
+            ws_profile_data = self.get_ws_profile_by_id(extension_installation_pk)
+            if not ws_profile_data:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Web Service Profile not found.")
+                return
+
+            client_id, client_secret, token_url = ws_profile_data[3], ws_profile_data[4], ws_profile_data[5]
+
+            base_url = f"{urllib.parse.urlparse(token_url).scheme}://{urllib.parse.urlparse(token_url).netloc}/"
+
+            # Get authentication token
+            auth_response = requests.post(token_url, data={
+                'grant_type': 'client_credentials', 
+                'client_id': client_id,
+                'client_secret': client_secret
+            })
+
+            if auth_response.status_code != 200:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Failed to authenticate.")
+                return
+
+            token = auth_response.json().get('access_token')
+            if not token:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Access token not found in response.")
+                return
+
+            webhook_data = self.get_webhook_by_id(extension_installation_pk)
+            if not webhook_data:
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"Webhook not found.")
+                return
+
+            webhook_code = webhook_data[1]
+            specific_api_url = f"{base_url}rest/v2/outgoingWebhooks/{webhook_code}/events"
+            event_data = {
+                "EventType": "table.record" + event_type,
+                "ObjectName": event_object,
+                "Enabled": "true"
+            }
+
+            # Call the specific POST API with the token
+            api_response = requests.post(specific_api_url, json=event_data, headers={'Authorization': f'Bearer {token}'})
+            
+            if api_response.status_code != 201:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Failed to call specific API.")
+                return
+
+            event_response = api_response.json()
+            webhook_event_id = event_response.get('Id')
+            cursor.execute('''INSERT INTO ct_extension_actions (extension_installation_pk, profile_id, webhook_event_id, 
+                           action_name, action_code, event_object,
+                           event_type, event_input_field, action_object,
+                           action_type, action_output_field)
+                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                           (extension_installation_pk, profile_id, webhook_event_id,
+                            action_name, action_code, event_object,
+                            event_type, event_input_field, action_object,
+                            action_type, action_output_field))
             db.commit()
         except mysql.connector.Error as err:
             print(f"Database error: {err}")
@@ -560,7 +720,7 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         finally:
             cursor.close()
             db.close()
-
+    
     def get_ws_profile_by_id(self, extension_installation_pk):
         ws_profile_data = self.execute_db_query('SELECT wsp.profile_id, wsp.account_id, wsp.profile_name, wsp.app_key, wsp.app_secret, wsp.token_url, wsp.extension_installation_pk FROM ct_ws_profiles wsp JOIN ct_extension_installations ei ON wsp.extension_installation_pk = ei.pk WHERE wsp.extension_installation_pk = %s', (extension_installation_pk,))
         return ws_profile_data[0] if ws_profile_data else None    
@@ -669,7 +829,25 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         finally:
             cursor.close()
             db.close()
+
+    def get_webhook_by_id(self, extension_installation_pk):
+        ws_profile_data = self.execute_db_query('SELECT w.id, w.webhook_code, w.webhook_name, w.secret, w.extension_installation_pk FROM ct_webhooks w JOIN ct_extension_installations ei ON w.extension_installation_pk = ei.pk WHERE w.extension_installation_pk = %s', (extension_installation_pk,))
+        return ws_profile_data[0] if ws_profile_data else None  
+    
+    def send_message_to_slack(self, channel, message, token):
+        url = 'https://slack.com/api/chat.postMessage'
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {token}'
+        }
+        payload = {
+            'channel': channel,
+            'text': message
+        }
         
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        return response.json()
+
 if __name__ == "__main__":
     with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
         print(f"Serving on port {PORT}")

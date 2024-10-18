@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Check for required environment variables
-required_env_vars = ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DB', 'APP_URL', 'PORT']
+required_env_vars = ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DB', 'APP_URL', 'PORT', 'SLACK_TOKEN']
 for var in required_env_vars:
     if os.getenv(var) is None:
         print(f"Error: Environment variable {var} is not set.")
@@ -20,6 +20,7 @@ for var in required_env_vars:
 
 PORT = int(os.environ.get('PORT', 8000))
 APP_URL = os.getenv("APP_URL")
+SLACK_TOKEN = os.getenv("SLACK_TOKEN")
 
 class MyHandler(http.server.SimpleHTTPRequestHandler):
     def send_html_response(self, template_path, replacements=None):
@@ -319,10 +320,10 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             message = payload.get('message')
 
             # Replace with your actual Slack bot token
-            slack_token = 'xoxb-7845531601254-7894967964693-8c3fNv8shewzhublD0huAfod'
+            token = SLACK_TOKEN
 
             # Send message to Slack
-            slack_response = self.send_message_to_slack(channel, message, slack_token)
+            slack_response = self.send_message_to_slack(channel, message, token)
 
             # Check response from Slack
             if slack_response.get('ok'):

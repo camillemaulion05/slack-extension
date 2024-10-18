@@ -479,7 +479,6 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         }
 
         response = requests.post(token_url, data=token_data)
-        print(f"Access token: {response}")
         token_response = response.json()
         if not token_response.get("ok"):
             self.send_response(400)
@@ -641,9 +640,8 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(b"Failed to call specific API.")
                 return
 
-            print(f"API request error: {api_response.json()}")
             webhook_response = api_response.json()
-            webhook_code = webhook_response.get('ID')
+            webhook_code = webhook_response.get('Id')
             secret = webhook_response.get('Secret')
 
             insert_query = '''INSERT INTO ct_webhooks (webhook_code, webhook_name, secret, extension_installation_pk)
